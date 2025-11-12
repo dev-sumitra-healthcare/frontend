@@ -41,7 +41,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  
+
   /* Modern spacing scale */
   --spacing-xs: 0.25rem;
   --spacing-sm: 0.5rem;
@@ -49,12 +49,51 @@
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
   --spacing-2xl: 3rem;
-  
+
   /* Enhanced shadows */
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  /* Custom Colors - Glassmorphism Design System */
+  --color-ocean-deep: #0A2540;
+  --color-ocean-mid: #1E3A5F;
+  --color-ocean-light: #2D4A75;
+
+  --color-sky-deep: #3B82F6;
+  --color-sky: #60A5FA;
+  --color-sky-light: #93C5FD;
+  --color-sky-pale: #BFDBFE;
+
+  --color-arctic-deep: #DBEAFE;
+  --color-arctic: #EFF6FF;
+  --color-arctic-light: #F0F9FF;
+
+  --color-teal-deep: #06B6D4;
+  --color-teal: #22D3EE;
+  --color-teal-light: #67E8F9;
+
+  --color-lavender-deep: #818CF8;
+  --color-lavender: #A5B4FC;
+  --color-lavender-light: #C7D2FE;
+
+  --color-pearl: #F8FAFC;
+
+  /* Additional radius values */
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+
+  /* Glass shadows */
+  --shadow-glass-sm: 0 4px 16px rgba(31, 38, 135, 0.1);
+  --shadow-glass-md: 0 8px 32px rgba(31, 38, 135, 0.15);
+  --shadow-glass-lg: 0 12px 40px rgba(31, 38, 135, 0.2);
+  --shadow-glass-xl: 0 20px 60px rgba(31, 38, 135, 0.25);
+
+  /* Glow effects */
+  --shadow-glow-blue: 0 0 20px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.2);
+  --shadow-glow-teal: 0 0 20px rgba(6, 182, 212, 0.4), 0 0 40px rgba(6, 182, 212, 0.2);
+  --shadow-glow-lavender: 0 0 20px rgba(129, 140, 248, 0.4), 0 0 40px rgba(129, 140, 248, 0.2);
 }
 
 :root {
@@ -245,5 +284,548 @@
   /* Staggered animations */
   .animate-stagger > * {
     animation-delay: calc(var(--stagger) * 100ms);
+  }
+
+  /* ========================================
+     GLASSMORPHISM UTILITIES
+     ======================================== */
+
+  /* Subtle Glass */
+  .glass-subtle {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 16px rgba(31, 38, 135, 0.1);
+  }
+
+  /* Default Glass */
+  .glass-default,
+  .glass {
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  /* Strong Glass */
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 12px 40px rgba(31, 38, 135, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  }
+
+  /* Opaque Glass */
+  .glass-opaque {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.12);
+  }
+
+  /* Tinted Glass Variants */
+  .glass-blue {
+    background: rgba(59, 130, 246, 0.15);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    box-shadow: 0 8px 32px rgba(59, 130, 246, 0.15);
+  }
+
+  .glass-teal {
+    background: rgba(6, 182, 212, 0.15);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(6, 182, 212, 0.2);
+    box-shadow: 0 8px 32px rgba(6, 182, 212, 0.15);
+  }
+
+  .glass-lavender {
+    background: rgba(129, 140, 248, 0.15);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(129, 140, 248, 0.2);
+    box-shadow: 0 8px 32px rgba(129, 140, 248, 0.15);
+  }
+
+  .glass-red {
+    background: rgba(239, 68, 68, 0.15);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.15);
+  }
+
+  /* Mobile-optimized glass (reduced blur) */
+  @media (max-width: 768px) {
+    .glass-mobile-subtle {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 2px 8px rgba(31, 38, 135, 0.08);
+    }
+
+    .glass-mobile-default {
+      background: rgba(255, 255, 255, 0.25);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      box-shadow: 0 4px 16px rgba(31, 38, 135, 0.12);
+    }
+
+    .glass-mobile-strong {
+      background: rgba(255, 255, 255, 0.4);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow: 0 6px 20px rgba(31, 38, 135, 0.15);
+    }
+  }
+
+  /* ========================================
+     GRADIENT UTILITIES
+     ======================================== */
+
+  /* Background Gradients */
+  .bg-gradient-primary {
+    background: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
+  }
+
+  .bg-gradient-primary-hover {
+    background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
+  }
+
+  .bg-gradient-sky-light {
+    background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 50%, #BFDBFE 100%);
+  }
+
+  .bg-gradient-sky-medium {
+    background: linear-gradient(135deg, #BFDBFE 0%, #93C5FD 50%, #60A5FA 100%);
+  }
+
+  .bg-gradient-sky-bold {
+    background: linear-gradient(135deg, #60A5FA 0%, #3B82F6 100%);
+  }
+
+  .bg-gradient-teal {
+    background: linear-gradient(135deg, #06B6D4 0%, #22D3EE 100%);
+  }
+
+  .bg-gradient-lavender {
+    background: linear-gradient(135deg, #818CF8 0%, #A5B4FC 100%);
+  }
+
+  .bg-gradient-ocean {
+    background: linear-gradient(135deg, #0A2540 0%, #1E3A5F 100%);
+  }
+
+  /* Radial Gradients */
+  .bg-radial-sky {
+    background: radial-gradient(circle at 50% 50%, #60A5FA 0%, #3B82F6 50%, #2563EB 100%);
+  }
+
+  .bg-radial-teal {
+    background: radial-gradient(circle at 50% 50%, #67E8F9 0%, #22D3EE 50%, #06B6D4 100%);
+  }
+
+  /* Mesh Gradients */
+  .bg-mesh-hero {
+    background:
+      radial-gradient(at 27% 37%, hsla(215, 98%, 61%, 0.3) 0px, transparent 50%),
+      radial-gradient(at 97% 21%, hsla(125, 98%, 72%, 0.1) 0px, transparent 50%),
+      radial-gradient(at 52% 99%, hsla(354, 98%, 61%, 0.1) 0px, transparent 50%),
+      radial-gradient(at 10% 29%, hsla(256, 96%, 67%, 0.2) 0px, transparent 50%),
+      radial-gradient(at 97% 96%, hsla(38, 60%, 74%, 0.1) 0px, transparent 50%),
+      radial-gradient(at 33% 50%, hsla(222, 67%, 73%, 0.3) 0px, transparent 50%),
+      radial-gradient(at 79% 53%, hsla(343, 68%, 79%, 0.1) 0px, transparent 50%);
+  }
+
+  .bg-mesh-subtle {
+    background:
+      radial-gradient(at 40% 20%, hsla(215, 98%, 61%, 0.15) 0px, transparent 50%),
+      radial-gradient(at 80% 0%, hsla(189, 100%, 56%, 0.15) 0px, transparent 50%),
+      radial-gradient(at 0% 50%, hsla(256, 96%, 67%, 0.1) 0px, transparent 50%),
+      radial-gradient(at 80% 50%, hsla(215, 98%, 61%, 0.1) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsla(256, 96%, 67%, 0.05) 0px, transparent 50%);
+  }
+
+  .bg-mesh-waves {
+    background:
+      radial-gradient(at 50% 0%, hsla(215, 98%, 61%, 0.2) 0px, transparent 50%),
+      radial-gradient(at 80% 100%, hsla(189, 100%, 56%, 0.15) 0px, transparent 50%),
+      radial-gradient(at 20% 100%, hsla(256, 96%, 67%, 0.1) 0px, transparent 50%);
+  }
+
+  /* Text Gradients */
+  .text-gradient-primary {
+    background: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  .text-gradient-teal {
+    background: linear-gradient(135deg, #06B6D4 0%, #22D3EE 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  .text-gradient-lavender {
+    background: linear-gradient(135deg, #818CF8 0%, #A5B4FC 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  .text-gradient-ocean {
+    background: linear-gradient(135deg, #1E3A5F 0%, #3B82F6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  /* ========================================
+     GLOW EFFECTS
+     ======================================== */
+
+  .glow-blue {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.2);
+  }
+
+  .glow-teal {
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.4), 0 0 40px rgba(6, 182, 212, 0.2);
+  }
+
+  .glow-lavender {
+    box-shadow: 0 0 20px rgba(129, 140, 248, 0.4), 0 0 40px rgba(129, 140, 248, 0.2);
+  }
+
+  /* ========================================
+     ADDITIONAL ANIMATIONS
+     ======================================== */
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1.05);
+    }
+  }
+
+  @keyframes gradient-rotate {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  @keyframes scale-in {
+    0% {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes slide-up {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slide-down {
+    0% {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .animate-gradient-rotate {
+    background-size: 200% 200%;
+    animation: gradient-rotate 4s ease infinite;
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.3s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.5s ease-out;
+  }
+
+  .animate-slide-down {
+    animation: slide-down 0.5s ease-out;
+  }
+
+  /* ========================================
+     UTILITY CLASSES
+     ======================================== */
+
+  /* Hover effects */
+  .hover-lift {
+    transition: transform 0.25s ease-out, box-shadow 0.25s ease-out;
+  }
+
+  .hover-lift:hover {
+    transform: scale(1.02) translateY(-2px);
+  }
+
+  .hover-lift:active {
+    transform: scale(1.01) translateY(-1px);
+  }
+
+  /* GPU acceleration */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+  }
+
+  /* Smooth scrollbar for glass aesthetic */
+  .glass-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .glass-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+  }
+
+  .glass-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+  }
+
+  .glass-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+  }
+}
+
+@layer utilities {
+  /* ========================================
+     TEXT COLOR UTILITIES
+     ======================================== */
+
+  /* Ocean Colors */
+  .text-ocean-deep {
+    color: var(--color-ocean-deep);
+  }
+
+  .text-ocean-mid {
+    color: var(--color-ocean-mid);
+  }
+
+  .text-ocean-light {
+    color: var(--color-ocean-light);
+  }
+
+  /* Sky Colors */
+  .text-sky-deep {
+    color: var(--color-sky-deep);
+  }
+
+  .text-sky {
+    color: var(--color-sky);
+  }
+
+  .text-sky-light {
+    color: var(--color-sky-light);
+  }
+
+  .text-sky-pale {
+    color: var(--color-sky-pale);
+  }
+
+  /* Arctic Colors */
+  .text-arctic-deep {
+    color: var(--color-arctic-deep);
+  }
+
+  .text-arctic {
+    color: var(--color-arctic);
+  }
+
+  .text-arctic-light {
+    color: var(--color-arctic-light);
+  }
+
+  /* Teal Colors */
+  .text-teal-deep {
+    color: var(--color-teal-deep);
+  }
+
+  .text-teal {
+    color: var(--color-teal);
+  }
+
+  .text-teal-light {
+    color: var(--color-teal-light);
+  }
+
+  /* Lavender Colors */
+  .text-lavender-deep {
+    color: var(--color-lavender-deep);
+  }
+
+  .text-lavender {
+    color: var(--color-lavender);
+  }
+
+  .text-lavender-light {
+    color: var(--color-lavender-light);
+  }
+
+  /* Pearl */
+  .text-pearl {
+    color: var(--color-pearl);
+  }
+
+  /* ========================================
+     BACKGROUND COLOR UTILITIES
+     ======================================== */
+
+  /* Ocean Backgrounds */
+  .bg-ocean-deep {
+    background-color: var(--color-ocean-deep);
+  }
+
+  .bg-ocean-mid {
+    background-color: var(--color-ocean-mid);
+  }
+
+  .bg-ocean-light {
+    background-color: var(--color-ocean-light);
+  }
+
+  /* Sky Backgrounds */
+  .bg-sky-deep {
+    background-color: var(--color-sky-deep);
+  }
+
+  .bg-sky {
+    background-color: var(--color-sky);
+  }
+
+  .bg-sky-light {
+    background-color: var(--color-sky-light);
+  }
+
+  .bg-sky-pale {
+    background-color: var(--color-sky-pale);
+  }
+
+  /* Arctic Backgrounds */
+  .bg-arctic-deep {
+    background-color: var(--color-arctic-deep);
+  }
+
+  .bg-arctic {
+    background-color: var(--color-arctic);
+  }
+
+  .bg-arctic-light {
+    background-color: var(--color-arctic-light);
+  }
+
+  /* Teal Backgrounds */
+  .bg-teal-deep {
+    background-color: var(--color-teal-deep);
+  }
+
+  .bg-teal {
+    background-color: var(--color-teal);
+  }
+
+  .bg-teal-light {
+    background-color: var(--color-teal-light);
+  }
+
+  /* Lavender Backgrounds */
+  .bg-lavender-deep {
+    background-color: var(--color-lavender-deep);
+  }
+
+  .bg-lavender {
+    background-color: var(--color-lavender);
+  }
+
+  .bg-lavender-light {
+    background-color: var(--color-lavender-light);
+  }
+
+  /* Pearl */
+  .bg-pearl {
+    background-color: var(--color-pearl);
+  }
+
+  /* ========================================
+     BORDER COLOR UTILITIES
+     ======================================== */
+
+  .border-ocean-deep {
+    border-color: var(--color-ocean-deep);
+  }
+
+  .border-sky {
+    border-color: var(--color-sky);
+  }
+
+  .border-sky-deep {
+    border-color: var(--color-sky-deep);
+  }
+
+  .border-teal {
+    border-color: var(--color-teal);
+  }
+
+  .border-lavender {
+    border-color: var(--color-lavender);
   }
 }

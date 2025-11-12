@@ -1,7 +1,5 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { PublicNav } from '@/components/layout/PublicNav';
-import { PublicFooter } from '@/components/layout/PublicFooter';
 import {
   Hero,
   ForDoctors,
@@ -10,7 +8,7 @@ import {
   FeatureShowcase,
   Trust,
   CTA,
-} from './(public)/components/sections';
+} from './components/sections';
 
 export const metadata: Metadata = {
   title: 'MedMitra - Modern Healthcare EMR Solutions',
@@ -43,20 +41,16 @@ export const metadata: Metadata = {
 /**
  * Landing Page - Main public homepage
  */
-export default function Home() {
+export default function LandingPage() {
   return (
-    <div className="relative min-h-screen">
-      <PublicNav />
-      <main className="relative">
-        <Hero />
-        <ForDoctors />
-        <ForPatients />
-        <ForCoordinators />
-        <FeatureShowcase />
-        <Trust />
-        <CTA />
-      </main>
-      <PublicFooter />
-    </div>
+    <>
+      <Hero />
+      <ForDoctors />
+      <ForPatients />
+      <ForCoordinators />
+      <FeatureShowcase />
+      <Trust />
+      <CTA />
+    </>
   );
 }
