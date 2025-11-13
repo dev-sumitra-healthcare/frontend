@@ -119,25 +119,25 @@ export default function CoordinatorRegister() {
 
   if (success) {
     return (
-      <div className="min-h-screen w-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-green-50 px-4 py-8">
-        <Card className="w-full max-w-md border-0 shadow-xl">
+      <div className="min-h-screen w-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-green-50 dark:from-background dark:via-background/95 dark:to-green-950/20 px-4 py-8">
+        <Card className="w-full max-w-md border-0 shadow-xl dark:shadow-2xl">
           <CardContent className="pt-12 pb-12">
             <div className="text-center">
               <div className="flex justify-center mb-6">
-                <div className="bg-green-100 p-4 rounded-full">
-                  <CheckCircle2 className="h-16 w-16 text-green-600" />
+                <div className="bg-green-100 dark:bg-green-900/30 p-4 rounded-full">
+                  <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-400" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
                 Registration Successful!
               </h2>
-              <p className="text-gray-600 mb-2">
+              <p className="text-gray-600 dark:text-gray-400 mb-2">
                 Your account has been created successfully.
               </p>
-              <p className="text-sm text-amber-600 mb-6">
+              <p className="text-sm text-amber-600 dark:text-amber-400 mb-6">
                 Your account is pending admin verification. You will be notified once approved.
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 Redirecting to login page...
               </p>
             </div>
@@ -148,25 +148,25 @@ export default function CoordinatorRegister() {
   }
 
   return (
-    <div className="min-h-screen w-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50 px-4 py-8">
+    <div className="min-h-screen w-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-background dark:via-background/95 dark:to-primary/5 px-4 py-8">
       <div className="w-full max-w-4/12">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="bg-blue-600 p-3 rounded-full">
+            <div className="bg-blue-600 dark:bg-blue-500 p-3 rounded-full shadow-lg dark:shadow-blue-500/20">
               <Building2 className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">
             Join as Coordinator
           </h1>
-          <p className="text-sm sm:text-base text-gray-600">
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
             Create your account to manage hospital operations
           </p>
         </div>
 
-        <Card className="border-0 shadow-xl mb-6">
+        <Card className="border-0 shadow-xl dark:shadow-2xl mb-6">
           <CardHeader className="pb-6">
-            <CardTitle className="text-xl sm:text-2xl font-bold text-center text-gray-900">
+            <CardTitle className="text-xl sm:text-2xl font-bold text-center text-gray-900 dark:text-gray-100">
               Coordinator Registration
             </CardTitle>
             <CardDescription className="text-center text-sm sm:text-base">
@@ -189,9 +189,9 @@ export default function CoordinatorRegister() {
                 <div className="space-y-2">
                   <Label
                     htmlFor="fullName"
-                    className="text-sm font-medium text-gray-700"
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Full Name <span className="text-red-500">*</span>
+                    Full Name <span className="text-red-500 dark:text-red-400">*</span>
                   </Label>
                   <Input
                     id="fullName"
@@ -209,9 +209,9 @@ export default function CoordinatorRegister() {
                 <div className="space-y-2">
                   <Label
                     htmlFor="email"
-                    className="text-sm font-medium text-gray-700"
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Email Address <span className="text-red-500">*</span>
+                    Email Address <span className="text-red-500 dark:text-red-400">*</span>
                   </Label>
                   <Input
                     id="email"
@@ -230,7 +230,7 @@ export default function CoordinatorRegister() {
               <div className="space-y-2">
                 <Label
                   htmlFor="phoneNumber"
-                  className="text-sm font-medium text-gray-700"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
                   Phone Number
                 </Label>
@@ -249,9 +249,9 @@ export default function CoordinatorRegister() {
               <div className="space-y-2">
                 <Label
                   htmlFor="hospitalId"
-                  className="text-sm font-medium text-gray-700"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  Hospital ID <span className="text-red-500">*</span>
+                  Hospital ID <span className="text-red-500 dark:text-red-400">*</span>
                 </Label>
                 <Input
                   id="hospitalId"
@@ -264,7 +264,7 @@ export default function CoordinatorRegister() {
                   className="h-11 w-full"
                   required
                 />
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   Contact your hospital administrator for your Hospital ID (UUID format)
                 </p>
               </div>
@@ -273,9 +273,9 @@ export default function CoordinatorRegister() {
                 <div className="space-y-2">
                   <Label
                     htmlFor="password"
-                    className="text-sm font-medium text-gray-700"
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Password <span className="text-red-500">*</span>
+                    Password <span className="text-red-500 dark:text-red-400">*</span>
                   </Label>
                   <Input
                     id="password"
@@ -293,9 +293,9 @@ export default function CoordinatorRegister() {
                 <div className="space-y-2">
                   <Label
                     htmlFor="confirmPassword"
-                    className="text-sm font-medium text-gray-700"
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Confirm Password <span className="text-red-500">*</span>
+                    Confirm Password <span className="text-red-500 dark:text-red-400">*</span>
                   </Label>
                   <Input
                     id="confirmPassword"
@@ -311,8 +311,8 @@ export default function CoordinatorRegister() {
                 </div>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-                <p className="text-xs text-blue-900">
+              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-6">
+                <p className="text-xs text-blue-900 dark:text-blue-300">
                   <strong>Important:</strong> After registration, your account will be in
                   <span className="font-semibold"> pending verification</span> status.
                   You'll be able to log in once an administrator approves your account.
@@ -338,21 +338,21 @@ export default function CoordinatorRegister() {
 
               <div className="relative w-full">
                 <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-gray-200" />
+                  <span className="w-full border-t border-gray-200 dark:border-gray-700" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-gray-500">
+                  <span className="bg-white dark:bg-card px-2 text-gray-500 dark:text-gray-400">
                     Already registered?
                   </span>
                 </div>
               </div>
 
               <div className="text-center w-full">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   Already have an account?{" "}
                   <a
                     href="/coordinator/login"
-                    className="font-semibold text-blue-600 hover:text-blue-700 hover:underline"
+                    className="font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline"
                   >
                     Sign in here
                   </a>
@@ -362,34 +362,34 @@ export default function CoordinatorRegister() {
           </form>
         </Card>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 mb-4">
-          <p className="text-xs sm:text-sm text-center text-gray-600 mb-3">
+        <div className="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-100 dark:border-border p-4 mb-4">
+          <p className="text-xs sm:text-sm text-center text-gray-600 dark:text-gray-400 mb-3">
             Looking for a different portal?
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs sm:text-sm">
             <a
               href="/login"
-              className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline font-medium"
             >
               Doctor Login
             </a>
-            <span className="hidden sm:inline text-gray-400">|</span>
+            <span className="hidden sm:inline text-gray-400 dark:text-gray-600">|</span>
             <a
               href="/admin/login"
-              className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline font-medium"
             >
               Admin Login
             </a>
           </div>
         </div>
 
-        <p className="text-center text-xs sm:text-sm text-gray-500">
+        <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
           By registering, you agree to our{" "}
-          <a href="/terms" className="text-blue-600 hover:underline">
+          <a href="/terms" className="text-blue-600 dark:text-blue-400 hover:underline">
             Terms of Service
           </a>{" "}
           and{" "}
-          <a href="/privacy" className="text-blue-600 hover:underline">
+          <a href="/privacy" className="text-blue-600 dark:text-blue-400 hover:underline">
             Privacy Policy
           </a>
         </p>

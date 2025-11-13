@@ -3,15 +3,17 @@
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { patientRegister } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { usePatientAuth } from '@/contexts/PatientAuthContext';
+import { GlassButton } from '@/components/glass/GlassButton';
+import { GlassCard } from '@/components/glass/GlassCard';
+import { GlassInput } from '@/components/glass/GlassInput';
+import { GradientText } from '@/components/gradient/GradientText';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 import { Mail, Lock, Eye, EyeOff, UserRound, HeartPulse, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { motion } from 'framer-motion';
 
 const PatientRegisterSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),
@@ -25,10 +27,17 @@ const PatientRegisterSchema = z.object({
 
 export default function PatientRegisterForm() {
   const router = useRouter();
+  const { register, isAuthenticated, isLoading: authLoading, error: authError, clearError } = usePatientAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace('/patient/dashboard');
+    }
+  }, [isAuthenticated, router]);
 
   const form = useForm<z.infer<typeof PatientRegisterSchema>>({
     resolver: zodResolver(PatientRegisterSchema),
@@ -37,126 +46,218 @@ export default function PatientRegisterForm() {
 
   const onSubmit = async (values: z.infer<typeof PatientRegisterSchema>) => {
     try {
-      setSubmitting(true);
-      setError(null);
+      clearError();
+      setLocalError(null);
+
       const { confirmPassword, ...payload } = values;
-      const resp = await patientRegister(payload);
-      const { accessToken, user } = resp.data;
-      if (accessToken && user) {
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('user', JSON.stringify(user));
-        toast.success('Registration Successful', {
-          description: 'Your account has been created successfully!',
-        });
-        router.replace('/patient/dashboard');
-      } else {
-        // If backend does not auto-login, redirect to login
-        toast.success('Registration Successful', {
-          description: 'Please sign in to continue.',
-          duration: 3000,
-        });
-        setTimeout(() => {
-          router.push('/auth?tab=login&role=patient');
-        }, 1500);
-      }
+      await register(payload);
+
+      toast.success('Registration Successful', {
+        description: 'Your account has been created successfully!',
+      });
+
+      // The context will handle navigation to dashboard if auto-login succeeds
+      // If not, redirect to login after a delay
+      setTimeout(() => {
+        if (!isAuthenticated) {
+          router.push('/patient/login');
+        }
+      }, 1500);
     } catch (e: any) {
-      const errorMessage = e?.response?.data?.message || e.message || 'Registration failed. Please try again.';
-      setError(errorMessage);
+      const errorMessage = e.message || 'Registration failed. Please try again.';
+      setLocalError(errorMessage);
       toast.error('Registration Failed', {
         description: errorMessage,
       });
-    } finally {
-      setSubmitting(false);
     }
   };
 
   return (
-    <Card className="w-[500px] shadow-xl border-muted/50">
-      <CardHeader className="space-y-2 text-center">
-        <div className="flex justify-center mb-2">
-          <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-            <HeartPulse className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+    <GlassCard variant="default" className="w-full max-w-[560px]">
+      <div className="p-8">
+        {/* Icon Badge */}
+        <motion.div
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 200, damping: 15 }}
+          className="flex justify-center mb-6"
+        >
+          <div className="relative h-16 w-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/50">
+            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-purple-400/20 to-pink-400/20 blur-xl"></div>
+            <HeartPulse className="h-8 w-8 text-white relative z-10" />
           </div>
+        </motion.div>
+
+        {/* Header */}
+        <div className="text-center mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <GradientText variant="lavender" className="text-3xl md:text-4xl font-bold mb-3">
+              Create Patient Account
+            </GradientText>
+          </motion.div>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="text-ocean-mid dark:text-gray-300 text-sm"
+          >
+            Register to access your healthcare portal
+          </motion.p>
         </div>
-        <CardTitle className="text-2xl font-bold">Create Patient Account</CardTitle>
-        <p className="text-muted-foreground text-sm">Register to access your healthcare portal</p>
-      </CardHeader>
-      <CardContent className="p-6">
-        {error && (
-          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md flex items-start gap-2">
-            <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
-            <p className="text-sm text-destructive">{error}</p>
-          </div>
+
+        {/* Error Display */}
+        {(authError || localError) && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 rounded-2xl backdrop-blur-sm bg-red-500/10 border border-red-500/20 flex items-start gap-3"
+          >
+            <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0 text-red-500" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">{authError || localError}</p>
+            </div>
+          </motion.div>
         )}
+
+        {/* Form */}
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField name="username" control={form.control} render={({ field }) => (
-              <FormItem className="space-y-2">
-                <FormLabel className="text-sm font-medium">Username</FormLabel>
-                <div className="relative">
-                  <UserRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <FormField name="username" control={form.control} render={({ field }) => (
+                <FormItem className="space-y-2">
+                  <FormLabel className="text-sm font-medium text-ocean-deep dark:text-gray-200">Username</FormLabel>
                   <FormControl>
-                    <Input className="pl-10 h-11 rounded-md" placeholder="your.username" {...field} />
+                    <GlassInput
+                      {...field}
+                      placeholder="your.username"
+                      icon={UserRound}
+                      className="h-12"
+                    />
                   </FormControl>
-                </div>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )} />
-            <FormField name="email" control={form.control} render={({ field }) => (
-              <FormItem className="space-y-2">
-                <FormLabel className="text-sm font-medium">Email</FormLabel>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )} />
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+            >
+              <FormField name="email" control={form.control} render={({ field }) => (
+                <FormItem className="space-y-2">
+                  <FormLabel className="text-sm font-medium text-ocean-deep dark:text-gray-200">Email</FormLabel>
                   <FormControl>
-                    <Input className="pl-10 h-11 rounded-md" placeholder="patient@example.com" type="email" {...field} />
+                    <GlassInput
+                      {...field}
+                      type="email"
+                      placeholder="patient@example.com"
+                      icon={Mail}
+                      className="h-12"
+                    />
                   </FormControl>
-                </div>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )} />
-            <FormField name="password" control={form.control} render={({ field }) => (
-              <FormItem className="space-y-2">
-                <FormLabel className="text-sm font-medium">Password</FormLabel>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <FormControl>
-                    <Input className="pl-10 pr-10 h-11 rounded-md" type={showPassword ? 'text' : 'password'} {...field} />
-                  </FormControl>
-                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2" onClick={() => setShowPassword((s) => !s)} tabIndex={-1}>
-                    {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                  </button>
-                </div>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )} />
-            <FormField name="confirmPassword" control={form.control} render={({ field }) => (
-              <FormItem className="space-y-2">
-                <FormLabel className="text-sm font-medium">Confirm Password</FormLabel>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <FormControl>
-                    <Input className="pl-10 pr-10 h-11 rounded-md" type={showConfirmPassword ? 'text' : 'password'} {...field} />
-                  </FormControl>
-                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2" onClick={() => setShowConfirmPassword((s) => !s)} tabIndex={-1}>
-                    {showConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                  </button>
-                </div>
-                <FormMessage className="text-xs" />
-              </FormItem>
-            )} />
-            <Button type="submit" className="w-full h-11 rounded-md font-medium transition-all" disabled={submitting}>
-              {submitting ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating account...
-                </div>
-              ) : (
-                'Create Account'
-              )}
-            </Button>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )} />
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.5 }}
+            >
+              <FormField name="password" control={form.control} render={({ field }) => (
+                <FormItem className="space-y-2">
+                  <FormLabel className="text-sm font-medium text-ocean-deep dark:text-gray-200">Password</FormLabel>
+                  <div className="relative">
+                    <FormControl>
+                      <GlassInput
+                        {...field}
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        icon={Lock}
+                        className="h-12 pr-12"
+                      />
+                    </FormControl>
+                    <button
+                      type="button"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-ocean-mid hover:text-ocean-deep dark:hover:text-gray-200 transition-colors"
+                      onClick={() => setShowPassword((s) => !s)}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )} />
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+            >
+              <FormField name="confirmPassword" control={form.control} render={({ field }) => (
+                <FormItem className="space-y-2">
+                  <FormLabel className="text-sm font-medium text-ocean-deep dark:text-gray-200">Confirm Password</FormLabel>
+                  <div className="relative">
+                    <FormControl>
+                      <GlassInput
+                        {...field}
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        icon={Lock}
+                        className="h-12 pr-12"
+                      />
+                    </FormControl>
+                    <button
+                      type="button"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-ocean-mid hover:text-ocean-deep dark:hover:text-gray-200 transition-colors"
+                      onClick={() => setShowConfirmPassword((s) => !s)}
+                      tabIndex={-1}
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )} />
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.7 }}
+            >
+              <GlassButton
+                type="submit"
+                variant="gradient"
+                size="lg"
+                className="w-full"
+                disabled={authLoading}
+              >
+                {authLoading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Creating account...
+                  </div>
+                ) : (
+                  'Create Account'
+                )}
+              </GlassButton>
+            </motion.div>
           </form>
         </Form>
-      </CardContent>
-    </Card>
+      </div>
+    </GlassCard>
   );
 }

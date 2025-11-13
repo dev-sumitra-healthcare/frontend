@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { motion, useScroll, useTransform } from 'framer-motion';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import React, { useState, useEffect } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Menu,
   X,
@@ -12,11 +12,11 @@ import {
   User,
   Users,
   UserCog,
-  Shield
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { GlassNavPill } from '@/components/glass/GlassNavPill';
-import { GlassButton } from '@/components/glass/GlassButton';
+  Shield,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { GlassNavPill } from "@/components/glass/GlassNavPill";
+import { GlassButton } from "@/components/glass/GlassButton";
 
 interface NavLink {
   name: string;
@@ -32,36 +32,36 @@ interface PortalLink {
 }
 
 const navLinks: NavLink[] = [
-  { name: 'Home', href: '/' },
-  { name: 'About', href: '/about' },
-  { name: 'Features', href: '/#features', scroll: true },
-  { name: 'Contact', href: '/contact' },
+  { name: "Home", href: "/" },
+  { name: "About", href: "/about" },
+  { name: "Features", href: "/#features", scroll: true },
+  { name: "Contact", href: "/contact" },
 ];
 
 const portalLinks: PortalLink[] = [
   {
-    name: 'Doctor Portal',
-    href: '/login',
+    name: "Doctor Portal",
+    href: "/doctor/login",
     icon: <User className="w-4 h-4" />,
-    description: 'Access your clinical dashboard',
+    description: "Access your clinical dashboard",
   },
   {
-    name: 'Patient Portal',
-    href: '/patient/dashboard',
+    name: "Patient Portal",
+    href: "/patient/login",
     icon: <Users className="w-4 h-4" />,
-    description: 'View your health records',
+    description: "View your health records",
   },
   {
-    name: 'Coordinator Access',
-    href: '/coordinator/login',
+    name: "Coordinator Access",
+    href: "/coordinator/login",
     icon: <UserCog className="w-4 h-4" />,
-    description: 'Manage appointments',
+    description: "Manage appointments",
   },
   {
-    name: 'Admin Panel',
-    href: '/admin/login',
+    name: "Admin Panel",
+    href: "/admin/login",
     icon: <Shield className="w-4 h-4" />,
-    description: 'System administration',
+    description: "System administration",
   },
 ];
 
@@ -83,8 +83,8 @@ export const PublicNav: React.FC = () => {
       setScrolled(window.scrollY > 20);
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   // Close mobile menu on route change
@@ -98,17 +98,17 @@ export const PublicNav: React.FC = () => {
       {/* Main Navigation */}
       <motion.nav
         className={cn(
-          'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
-          'px-4 md:px-6 lg:px-8'
+          "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+          "px-4 md:px-6 lg:px-8"
         )}
         style={{ opacity: navOpacity }}
       >
         <div
           className={cn(
-            'max-w-7xl mx-auto',
-            'glass-opaque rounded-2xl',
-            'transition-all duration-300',
-            scrolled ? 'mt-2 shadow-glass-lg' : 'mt-5 shadow-glass-md'
+            "max-w-7xl mx-auto",
+            "glass-opaque rounded-2xl",
+            "transition-all duration-300",
+            scrolled ? "mt-2 shadow-glass-lg" : "mt-5 shadow-glass-md"
           )}
         >
           <div className="flex items-center justify-between h-16 md:h-20 px-4 md:px-6">
@@ -152,8 +152,8 @@ export const PublicNav: React.FC = () => {
                   iconAfter={
                     <ChevronDown
                       className={cn(
-                        'w-4 h-4 transition-transform',
-                        portalDropdownOpen && 'rotate-180'
+                        "w-4 h-4 transition-transform",
+                        portalDropdownOpen && "rotate-180"
                       )}
                     />
                   }
@@ -161,7 +161,7 @@ export const PublicNav: React.FC = () => {
                   Portal Login
                 </GlassButton>
 
-                {/* Dropdown Menu */}
+                {/* Dropdown Menu - FIXED OPACITY */}
                 {portalDropdownOpen && (
                   <>
                     <div
@@ -169,7 +169,13 @@ export const PublicNav: React.FC = () => {
                       onClick={() => setPortalDropdownOpen(false)}
                     />
                     <motion.div
-                      className="absolute top-full right-0 mt-2 w-72 glass-strong rounded-2xl p-2 shadow-glass-xl z-50"
+                      className={cn(
+                        "absolute top-full right-0 mt-2 w-72 z-50",
+                        "bg-white/95 dark:bg-gray-900/95", // More opaque background
+                        "backdrop-blur-xl backdrop-saturate-150", // Stronger blur effect
+                        "border border-gray-200/50 dark:border-gray-700/50", // Add border for definition
+                        "rounded-2xl p-2 shadow-2xl" // Stronger shadow
+                      )}
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
@@ -179,19 +185,20 @@ export const PublicNav: React.FC = () => {
                           key={portal.href}
                           href={portal.href}
                           className={cn(
-                            'flex items-start gap-3 p-3 rounded-xl',
-                            'hover:bg-gradient-primary/10 transition-colors',
-                            'group'
+                            "flex items-start gap-3 p-3 rounded-xl",
+                            "hover:bg-gradient-primary/20 dark:hover:bg-gradient-primary/30", // Stronger hover effect
+                            "transition-all duration-200",
+                            "group"
                           )}
                         >
-                          <div className="p-2 rounded-lg bg-gradient-primary text-white group-hover:scale-110 transition-transform">
+                          <div className="p-2 rounded-lg bg-gradient-primary text-white group-hover:scale-110 transition-transform shadow-sm">
                             {portal.icon}
                           </div>
                           <div className="flex-1">
-                            <h4 className="font-semibold text-ocean-deep dark:text-white">
+                            <h4 className="font-semibold text-gray-900 dark:text-white">
                               {portal.name}
                             </h4>
-                            <p className="text-sm text-ocean-mid/70 dark:text-white/70">
+                            <p className="text-sm text-gray-600 dark:text-gray-300">
                               {portal.description}
                             </p>
                           </div>
@@ -203,7 +210,7 @@ export const PublicNav: React.FC = () => {
               </div>
 
               {/* Get Started Button */}
-              <Link href="/register">
+              {/* <Link href="/doctor/register">
                 <GlassButton
                   variant="gradient"
                   gradient="primary"
@@ -212,7 +219,7 @@ export const PublicNav: React.FC = () => {
                 >
                   Get Started
                 </GlassButton>
-              </Link>
+              </Link> */}
             </div>
 
             {/* Mobile Menu Button */}
@@ -231,15 +238,21 @@ export const PublicNav: React.FC = () => {
         </div>
       </motion.nav>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu - FIXED OPACITY */}
       {mobileMenuOpen && (
         <>
           <div
-            className="fixed inset-0 bg-ocean-deep/20 backdrop-blur-sm z-40 lg:hidden"
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
           <motion.div
-            className="fixed top-24 left-4 right-4 z-50 lg:hidden glass-strong rounded-2xl p-6 shadow-glass-xl"
+            className={cn(
+              "fixed top-24 left-4 right-4 z-50 lg:hidden",
+              "bg-white/95 dark:bg-gray-900/95", // More opaque background
+              "backdrop-blur-xl backdrop-saturate-150", // Stronger blur
+              "border border-gray-200/50 dark:border-gray-700/50", // Add border
+              "rounded-2xl p-6 shadow-2xl" // Stronger shadow
+            )}
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -251,10 +264,10 @@ export const PublicNav: React.FC = () => {
                   key={link.href}
                   href={link.href}
                   className={cn(
-                    'px-4 py-3 rounded-xl font-medium transition-all',
+                    "px-4 py-3 rounded-xl font-medium transition-all",
                     pathname === link.href
-                      ? 'bg-gradient-primary text-white'
-                      : 'text-ocean-mid dark:text-white hover:bg-glass-subtle'
+                      ? "bg-gradient-primary text-white shadow-lg"
+                      : "text-gray-700 dark:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-gray-800/80"
                   )}
                 >
                   {link.name}
@@ -264,20 +277,20 @@ export const PublicNav: React.FC = () => {
 
             {/* Mobile Portal Links */}
             <div className="space-y-2 mb-6">
-              <p className="text-sm font-semibold text-ocean-mid/70 dark:text-white/70 px-4">
+              <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 px-4">
                 Portal Access
               </p>
               {portalLinks.map((portal) => (
                 <Link
                   key={portal.href}
                   href={portal.href}
-                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-gradient-primary/10 transition-colors"
+                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-gradient-primary/20 dark:hover:bg-gradient-primary/30 transition-colors"
                 >
-                  <div className="p-2 rounded-lg bg-gradient-primary text-white">
+                  <div className="p-2 rounded-lg bg-gradient-primary text-white shadow-sm">
                     {portal.icon}
                   </div>
                   <div>
-                    <h4 className="font-semibold text-ocean-deep dark:text-white text-sm">
+                    <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
                       {portal.name}
                     </h4>
                   </div>
@@ -286,7 +299,7 @@ export const PublicNav: React.FC = () => {
             </div>
 
             {/* Mobile Get Started Button */}
-            <Link href="/register">
+            {/* <Link href="/doctor/register">
               <GlassButton
                 variant="gradient"
                 gradient="primary"
@@ -295,7 +308,7 @@ export const PublicNav: React.FC = () => {
               >
                 Get Started
               </GlassButton>
-            </Link>
+            </Link> */}
           </motion.div>
         </>
       )}
@@ -303,4 +316,4 @@ export const PublicNav: React.FC = () => {
   );
 };
 
-PublicNav.displayName = 'PublicNav';
+PublicNav.displayName = "PublicNav";
