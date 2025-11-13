@@ -158,7 +158,7 @@ export const PublicNav: React.FC = () => {
                     />
                   }
                 >
-                  Portal Login
+                  Services
                 </GlassButton>
 
                 {/* Dropdown Menu - FIXED OPACITY */}
@@ -278,7 +278,7 @@ export const PublicNav: React.FC = () => {
             {/* Mobile Portal Links */}
             <div className="space-y-2 mb-6">
               <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 px-4">
-                Portal Access
+                Services
               </p>
               {portalLinks.map((portal) => (
                 <Link
