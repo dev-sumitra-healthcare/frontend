@@ -378,8 +378,8 @@ apiClient.interceptors.request.use(
   (config) => {
     // Only access localStorage on client side (not during SSR)
     if (typeof window !== 'undefined') {
-      const isCoordinatorEndpoint = config.url?.includes('/coordinator');
-      const isAdminEndpoint = config.url?.includes('/admin');
+      const isCoordinatorEndpoint = config.url?.startsWith('/coordinator/') || config.url === '/coordinator';
+      const isAdminEndpoint = config.url?.startsWith('/admin/') || config.url === '/admin';
       
       let token: string | null = null;
       if (isCoordinatorEndpoint) {
@@ -409,10 +409,10 @@ apiClient.interceptors.response.use(
     
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      
+
       try {
-        const isCoordinatorEndpoint = originalRequest.url?.includes('/coordinator');
-        const isAdminEndpoint = originalRequest.url?.includes('/admin');
+        const isCoordinatorEndpoint = originalRequest.url?.startsWith('/coordinator/') || originalRequest.url === '/coordinator';
+        const isAdminEndpoint = originalRequest.url?.startsWith('/admin/') || originalRequest.url === '/admin';
         
         let refreshEndpoint = '/refresh-token'; // default doctor
         if (isCoordinatorEndpoint) {
@@ -447,8 +447,8 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         // Refresh failed, redirect to appropriate login page (client-side only)
         if (typeof window !== 'undefined') {
-          const isCoordinatorEndpoint = originalRequest.url?.includes('/coordinator');
-          const isAdminEndpoint = originalRequest.url?.includes('/admin');
+          const isCoordinatorEndpoint = originalRequest.url?.startsWith('/coordinator/') || originalRequest.url === '/coordinator';
+          const isAdminEndpoint = originalRequest.url?.startsWith('/admin/') || originalRequest.url === '/admin';
 
           localStorage.removeItem("accessToken");
           localStorage.removeItem("adminAccessToken");
