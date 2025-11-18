@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,8 +14,15 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2, Building2, AlertCircle, CheckCircle2 } from "lucide-react";
-import { registerCoordinator, type CoordinatorRegistrationRequest } from "@/lib/api";
+import { registerCoordinator, type CoordinatorRegistrationRequest, getActiveHospitals, type Hospital } from "@/lib/api";
 
 export default function CoordinatorRegister() {
   const router = useRouter();
@@ -30,6 +37,27 @@ export default function CoordinatorRegister() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [hospitals, setHospitals] = useState<Hospital[]>([]);
+  const [loadingHospitals, setLoadingHospitals] = useState(true);
+
+  // Fetch hospitals on component mount
+  useEffect(() => {
+    const fetchHospitals = async () => {
+      try {
+        const response = await getActiveHospitals();
+        if (response.data.success) {
+          setHospitals(response.data.data.hospitals);
+        }
+      } catch (error) {
+        console.error('Failed to fetch hospitals:', error);
+        setError('Failed to load hospitals. Please refresh the page.');
+      } finally {
+        setLoadingHospitals(false);
+      }
+    };
+
+    fetchHospitals();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const { name, value } = e.target;
@@ -42,6 +70,14 @@ export default function CoordinatorRegister() {
         [name]: value,
       }));
     }
+    setError("");
+  };
+
+  const handleSelectChange = (name: string, value: string): void => {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
     setError("");
   };
 
@@ -69,6 +105,12 @@ export default function CoordinatorRegister() {
 
     if (formData.password.length < 8) {
       setError("Password must be at least 8 characters long");
+      return false;
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
+    if (!passwordRegex.test(formData.password)) {
+      setError("Password must contain at least one lowercase letter, one uppercase letter, and one number");
       return false;
     }
 
@@ -109,9 +151,15 @@ export default function CoordinatorRegister() {
       }
     } catch (err: any) {
       console.error("Registration error:", err);
-      const errorMessage = err.response?.data?.message ||
-        "Registration failed. Please check your information and try again.";
-      setError(errorMessage);
+      // Handle validation errors array from backend
+      if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
+        const errorMessages = err.response.data.errors.map((e: any) => e.msg).join(', ');
+        setError(errorMessages);
+      } else {
+        const errorMessage = err.response?.data?.message ||
+          "Registration failed. Please check your information and try again.";
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -251,21 +299,43 @@ export default function CoordinatorRegister() {
                   htmlFor="hospitalId"
                   className="text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  Hospital ID <span className="text-red-500 dark:text-red-400">*</span>
+                  Hospital <span className="text-red-500 dark:text-red-400">*</span>
                 </Label>
-                <Input
-                  id="hospitalId"
-                  name="hospitalId"
-                  type="text"
-                  placeholder="Enter your hospital's unique ID"
-                  value={formData.hospitalId}
-                  onChange={handleChange}
-                  disabled={loading}
-                  className="h-11 w-full"
-                  required
-                />
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 z-10 pointer-events-none" />
+                  <Select
+                    disabled={loadingHospitals || loading}
+                    onValueChange={(value) => handleSelectChange("hospitalId", value)}
+                    value={formData.hospitalId}
+                  >
+                    <SelectTrigger className="pl-11 h-11 w-full">
+                      <SelectValue
+                        placeholder={
+                          loadingHospitals
+                            ? "Loading hospitals..."
+                            : "Select your hospital"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hospitals.map((hospital) => (
+                        <SelectItem key={hospital.id} value={hospital.id}>
+                          {hospital.name}
+                          {hospital.city && hospital.state
+                            ? ` (${hospital.city}, ${hospital.state})`
+                            : ''}
+                        </SelectItem>
+                      ))}
+                      {hospitals.length === 0 && !loadingHospitals && (
+                        <SelectItem value="no-hospitals" disabled>
+                          No hospitals available
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Contact your hospital administrator for your Hospital ID (UUID format)
+                  Select the hospital where you work as a coordinator
                 </p>
               </div>
 
