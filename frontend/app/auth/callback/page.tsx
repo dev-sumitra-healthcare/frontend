@@ -28,7 +28,7 @@ export default function OAuthCallbackPage() {
           
           // Redirect to login after a delay
           setTimeout(() => {
-            router.push("/login");
+            router.push("/doctor/login");
           }, 3000);
           return;
         }
@@ -42,7 +42,7 @@ export default function OAuthCallbackPage() {
           
           // Redirect to login after a delay
           setTimeout(() => {
-            router.push("/login");
+            router.push("/doctor/login");
           }, 3000);
           return;
         }
@@ -83,7 +83,7 @@ export default function OAuthCallbackPage() {
         
         // Redirect to login after a delay
         setTimeout(() => {
-          router.push("/login");
+          router.push("/doctor/login");
         }, 3000);
       }
     };

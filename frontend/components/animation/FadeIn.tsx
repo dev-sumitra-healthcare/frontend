@@ -50,7 +50,7 @@ export const FadeIn: React.FC<FadeInProps> = ({
   return (
     <motion.div
       ref={ref}
-      className={cn(className)}
+      className={cn('w-full', className)}
       initial={{ opacity: 0, y: yOffset }}
       animate={
         inView

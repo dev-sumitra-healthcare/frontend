@@ -321,6 +321,7 @@ export interface DoctorStatsResponse {
 // Interfaces for Encounter API
 export interface EncounterDataResponse {
   success: boolean;
+  message?: string;
   data: {
     bundle: {
       encounter: {
@@ -381,12 +382,33 @@ apiClient.interceptors.request.use(
       const isCoordinatorEndpoint = config.url?.startsWith('/coordinator/') || config.url === '/coordinator';
       const isAdminEndpoint = config.url?.startsWith('/admin/') || config.url === '/admin';
       
+      // Patient self-service endpoints (use patientAccessToken):
+      // - /patients/me/* - patient profile
+      // - /patients/appointments - booking appointments
+      // - /patients/specialties - listing specialties
+      // - /patients/doctors/* - searching doctors, availability
+      // 
+      // Doctor endpoints accessing patient data (use accessToken):
+      // - /patients/global/* - global patient search
+      // - /patients/:uuid - doctor viewing specific patient (UUID format)
+      const isPatientSelfEndpoint = config.url?.startsWith('/patients/me') ||
+                                     config.url?.startsWith('/patients/appointments') ||
+                                     config.url?.startsWith('/patients/specialties') ||
+                                     config.url?.startsWith('/patients/doctors');
+      
+      // Doctor accessing patient data (global search or specific patient by UUID)
+      const isDoctorPatientEndpoint = config.url?.startsWith('/patients/global');
+      
       let token: string | null = null;
       if (isCoordinatorEndpoint) {
         token = localStorage.getItem("coordinatorAccessToken");
       } else if (isAdminEndpoint) {
         token = localStorage.getItem("adminAccessToken");
+      } else if (isPatientSelfEndpoint && !isDoctorPatientEndpoint) {
+        // Patient self-service endpoints use patient token
+        token = localStorage.getItem("patientAccessToken");
       } else {
+        // All other endpoints (including /patients/global/* and /patients/:id) use doctor token
         token = localStorage.getItem("accessToken");
       }
       
@@ -408,17 +430,31 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config as any;
     
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Don't retry login endpoints
+      if (originalRequest.url?.includes('/login')) {
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
 
       try {
         const isCoordinatorEndpoint = originalRequest.url?.startsWith('/coordinator/') || originalRequest.url === '/coordinator';
         const isAdminEndpoint = originalRequest.url?.startsWith('/admin/') || originalRequest.url === '/admin';
+        // Patient self-service endpoints (same logic as request interceptor)
+        const isPatientSelfEndpoint = originalRequest.url?.startsWith('/patients/me') ||
+                                       originalRequest.url?.startsWith('/patients/appointments') ||
+                                       originalRequest.url?.startsWith('/patients/specialties') ||
+                                       originalRequest.url?.startsWith('/patients/doctors');
+        const isDoctorPatientEndpoint = originalRequest.url?.startsWith('/patients/global');
+        const isPatientEndpoint = isPatientSelfEndpoint && !isDoctorPatientEndpoint;
         
         let refreshEndpoint = '/refresh-token'; // default doctor
         if (isCoordinatorEndpoint) {
           refreshEndpoint = '/auth/coordinator/refresh-token';
         } else if (isAdminEndpoint) {
           refreshEndpoint = '/admin/refresh-token';
+        } else if (isPatientEndpoint) {
+          refreshEndpoint = '/auth/refresh-token'; // patient uses common auth refresh
         }
         
         // Try to refresh the token
@@ -428,7 +464,7 @@ apiClient.interceptors.response.use(
           { withCredentials: true }
         );
         
-        const newToken = refreshResponse.data.data.accessToken;
+        const newToken = refreshResponse.data?.data?.accessToken || refreshResponse.data?.accessToken;
         
         // Update the appropriate token in localStorage (client-side only)
         if (typeof window !== 'undefined') {
@@ -436,6 +472,8 @@ apiClient.interceptors.response.use(
             localStorage.setItem("coordinatorAccessToken", newToken);
           } else if (isAdminEndpoint) {
             localStorage.setItem("adminAccessToken", newToken);
+          } else if (isPatientEndpoint) {
+            localStorage.setItem("patientAccessToken", newToken);
           } else {
             localStorage.setItem("accessToken", newToken);
           }
@@ -449,20 +487,44 @@ apiClient.interceptors.response.use(
         if (typeof window !== 'undefined') {
           const isCoordinatorEndpoint = originalRequest.url?.startsWith('/coordinator/') || originalRequest.url === '/coordinator';
           const isAdminEndpoint = originalRequest.url?.startsWith('/admin/') || originalRequest.url === '/admin';
+          // Patient self-service endpoints (same logic as above)
+          const isPatientSelfEndpoint = originalRequest.url?.startsWith('/patients/me') ||
+                                         originalRequest.url?.startsWith('/patients/appointments') ||
+                                         originalRequest.url?.startsWith('/patients/specialties') ||
+                                         originalRequest.url?.startsWith('/patients/doctors');
+          const isDoctorPatientEndpoint = originalRequest.url?.startsWith('/patients/global');
+          const isPatientEndpoint = isPatientSelfEndpoint && !isDoctorPatientEndpoint;
 
+          // Clear all auth tokens
           localStorage.removeItem("accessToken");
           localStorage.removeItem("adminAccessToken");
           localStorage.removeItem("coordinatorAccessToken");
+          localStorage.removeItem("patientAccessToken");
           localStorage.removeItem("user");
           localStorage.removeItem("admin");
           localStorage.removeItem("coordinatorData");
+          localStorage.removeItem("patientUser");
 
           if (isCoordinatorEndpoint) {
             window.location.href = "/coordinator/login";
           } else if (isAdminEndpoint) {
             window.location.href = "/admin/login";
+          } else if (isPatientEndpoint) {
+            window.location.href = "/patient/login";
           } else {
-            window.location.href = "/login";
+            // Fallback: Check current window location to determine where to redirect
+            const currentPath = window.location.pathname;
+            
+            if (currentPath.startsWith('/patient')) {
+              window.location.href = "/patient/login";
+            } else if (currentPath.startsWith('/coordinator')) {
+              window.location.href = "/coordinator/login";
+            } else if (currentPath.startsWith('/admin')) {
+              window.location.href = "/admin/login";
+            } else {
+              // Default to doctor login only if we are in doctor area or unknown
+              window.location.href = "/doctor/login";
+            }
           }
         }
         return Promise.reject(refreshError);
@@ -505,7 +567,185 @@ export const updateDoctorProfile = async (data: UpdateDoctorProfileRequest): Pro
   return apiClient.put("/profile", data);
 };
 
+// 7. Update Doctor UI Preferences (Configure Pad)
+export interface DoctorUIPreferences {
+  vitalsOrder?: string[];           // e.g., ["bp", "pulse", "temp", "weight"]
+  defaultView?: 'compact' | 'detailed' | 'minimal';
+  encounterFormOrder?: string[];    // e.g., ["vitals", "diagnosis", "medications", "notes"]
+}
+
+export interface UpdatePreferencesResponse {
+  success: boolean;
+  message: string;
+  data: {
+    preferences: DoctorUIPreferences;
+  };
+}
+
+export const updateDoctorPreferences = async (preferences: DoctorUIPreferences): Promise<AxiosResponse<UpdatePreferencesResponse>> => {
+  return apiClient.put("/doctors/me/preferences", preferences);
+};
+
+// --- Coordinator Triage API Functions ---
+
+export interface TriageVitals {
+  bp?: string;        // Blood pressure e.g., "120/80"
+  pulse?: number;     // Heart rate
+  temp?: number;      // Temperature in F
+  weight?: number;    // Weight in kg
+  height?: number;    // Height in cm
+}
+
+export interface TriagePayment {
+  amount: number;
+  method: 'Cash' | 'UPI' | 'Card' | 'Insurance';
+  status: 'pending' | 'paid' | 'failed';
+  transactionId?: string;
+}
+
+export interface CreateTriageRequest {
+  vitals?: TriageVitals;
+  payment?: TriagePayment;
+}
+
+export interface CreateTriageResponse {
+  success: boolean;
+  message: string;
+  data: {
+    encounterId: string;
+    encounterStatus: string;
+    paymentId?: string;
+    paymentStatus?: string;
+  };
+}
+
+export const createTriageEncounter = async (
+  appointmentId: string, 
+  data: CreateTriageRequest
+): Promise<AxiosResponse<CreateTriageResponse>> => {
+  return apiClient.post(`/coordinator/appointments/encounters/${appointmentId}/triage`, data);
+};
+
+// --- Doctor Coordinator Management API Functions ---
+
+export interface DoctorCoordinator {
+  id: string;
+  fullName: string;
+  email: string;
+  phoneNumber?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface GetDoctorCoordinatorsResponse {
+  success: boolean;
+  data: {
+    coordinators: DoctorCoordinator[];
+  };
+}
+
+export interface CreateDoctorCoordinatorRequest {
+  fullName: string;
+  email: string;
+  phoneNumber?: string;
+}
+
+export interface CreateDoctorCoordinatorResponse {
+  success: boolean;
+  message: string;
+  data: {
+    coordinator: DoctorCoordinator;
+    tempPassword: string;
+  };
+}
+
+export interface ToggleDoctorCoordinatorAccessResponse {
+  success: boolean;
+  message: string;
+  data: {
+    coordinator: DoctorCoordinator;
+  };
+}
+
+export const getDoctorCoordinators = async (): Promise<AxiosResponse<GetDoctorCoordinatorsResponse>> => {
+  return apiClient.get("/doctors/coordinators");
+};
+
+export const createDoctorCoordinator = async (data: CreateDoctorCoordinatorRequest): Promise<AxiosResponse<CreateDoctorCoordinatorResponse>> => {
+  return apiClient.post("/doctors/coordinators", data);
+};
+
+export const toggleDoctorCoordinatorAccess = async (id: string, isActive: boolean): Promise<AxiosResponse<ToggleDoctorCoordinatorAccessResponse>> => {
+  return apiClient.put(`/doctors/coordinators/${id}/access`, { isActive });
+};
+
+export const deleteDoctorCoordinator = async (id: string): Promise<AxiosResponse<{ success: boolean; message: string }>> => {
+  return apiClient.delete(`/doctors/coordinators/${id}`);
+};
+
+// --- Doctor Dashboard API Functions ---
+
+export interface DashboardQueueItem {
+  appointmentId: string;
+  scheduledTime: string;
+  appointmentType: string;
+  status: string;
+  triageStatus: 'scheduled' | 'waiting' | 'ready' | 'in-progress' | 'completed';
+  patient: {
+    id: string | null;
+    fullName: string;
+    uhid: string | null;
+    mid: string | null;
+  };
+  vitals: Record<string, any> | null;
+  triageRecordedAt: string | null;
+}
+
+export interface DashboardActionItems {
+  pendingDocumentation: number;
+  pendingLabResults: number;
+  waitingPatients: number;
+}
+
+export interface DashboardPerformanceStats {
+  patientsSeen: number;
+  patientsScheduled: number;
+  avgConsultTime: number;
+}
+
+export interface DoctorDashboardResponse {
+  status: string;
+  data: {
+    todaysQueue: DashboardQueueItem[];
+    actionItems: DashboardActionItems;
+    performanceStats: DashboardPerformanceStats;
+  };
+}
+
+// Get complete doctor dashboard data
+export const getDoctorDashboard = async (): Promise<AxiosResponse<DoctorDashboardResponse>> => {
+  return apiClient.get("/doctors/me/dashboard");
+};
+
+// Get today's appointment queue (or for specific date)
+export const getTodaysQueue = async (date?: string): Promise<AxiosResponse<{ status: string; data: DashboardQueueItem[] }>> => {
+  const params = date ? { date } : {};
+  return apiClient.get("/doctors/me/queue", { params });
+};
+
+// Get action items for doctor
+export const getDoctorActionItems = async (): Promise<AxiosResponse<{ status: string; data: DashboardActionItems }>> => {
+  return apiClient.get("/doctors/me/action-items");
+};
+
+// Get doctor performance stats
+export const getDoctorStats = async (): Promise<AxiosResponse<{ status: string; data: DashboardPerformanceStats }>> => {
+  return apiClient.get("/doctors/me/stats");
+};
+
 // --- API Functions for Admin ---
+
 
 // 7. Admin Registration
 export const registerAdmin = async (data: AdminRegistrationRequest): Promise<AxiosResponse<AdminRegistrationResponse>> => {
@@ -564,10 +804,7 @@ export const getWorkbenchSummary = async (): Promise<AxiosResponse<WorkbenchSumm
   return apiClient.get("/workbench/summary");
 };
 
-// 12. Get Doctor Stats
-export const getDoctorStats = async (): Promise<AxiosResponse<DoctorStatsResponse>> => {
-  return apiClient.get("/practitioners/me/stats");
-};
+// 12. Get Doctor Stats - DEPRECATED: Use getDoctorStats from Dashboard API section instead
 
 // --- API Functions for Dashboard ---
 // Note: These endpoints may need to be implemented in the backend
@@ -764,6 +1001,54 @@ export const searchPatients = async (q: string, page = 1, limit = 20) => {
   return apiClient.get(`/patients/search`, { params: { q, page, limit } });
 };
 
+// Global Patient Search (across MedMitra network)
+export interface GlobalPatientResult {
+  id: string;
+  mid: string;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  gender: string | null;
+  age: number | null;
+  date_of_birth: string | null;
+  isLocal: boolean;
+  status: 'local' | 'network';
+  statusLabel: string;
+}
+
+export interface GlobalSearchResponse {
+  success: boolean;
+  message: string;
+  data: {
+    results: GlobalPatientResult[];
+    total: number;
+    page: number;
+    limit: number;
+  };
+}
+
+export const searchGlobalPatients = async (q: string, page = 1, limit = 20): Promise<AxiosResponse<GlobalSearchResponse>> => {
+  return apiClient.get('/patients/global/search', { params: { q, page, limit } });
+};
+
+export interface EnrollPatientResponse {
+  success: boolean;
+  message: string;
+  data: {
+    patientId: string;
+    uhid?: string;
+    alreadyEnrolled: boolean;
+  };
+}
+
+export const enrollGlobalPatient = async (globalPatientId: string): Promise<AxiosResponse<EnrollPatientResponse>> => {
+  return apiClient.post(`/patients/global/${globalPatientId}/enroll`);
+};
+
+export const registerExistingPatient = async (patientId: string) => {
+  return apiClient.post(`/patients/${patientId}/enroll`);
+};
+
 // --- Patient Portal (Self) API Functions ---
 export interface PatientUpcomingAppointment {
   appointmentId: string;
@@ -797,14 +1082,131 @@ export const getMyUpcomingAppointments = async (params?: { status?: string }) =>
   return apiClient.get<PatientUpcomingAppointmentsResponse>(`/patients/me/appointments`, { params });
 };
 
-export const getMyRecentActivity = async () => {
-  return apiClient.get<PatientActivityResponse>(`/patients/me/activity`);
+// --- Universal ID System API Functions ---
+
+export interface GlobalPatient {
+  id: string;
+  mid: string;
+  fullName: string;
+  phone: string;
+  email?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  bloodType?: string;
+  allergies?: string[];
+  chronicConditions?: string[];
+}
+
+export interface GlobalPatientRegistrationRequest {
+  fullName: string;
+  phone: string;
+  email?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  bloodType?: string;
+  allergies?: string[];
+  chronicConditions?: string[];
+  hospitalId: string;
+  insuranceProvider?: string;
+  insurancePolicyNumber?: string;
+}
+
+export interface GlobalPatientSearchResponse {
+  success: boolean;
+  data: {
+    results: GlobalPatient[];
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+  };
+}
+
+export interface EnrollPatientRequest {
+  hospitalId: string;
+  insuranceProvider?: string;
+  insurancePolicyNumber?: string;
+}
+
+export interface UnifiedEncounter {
+  id: string;
+  encounter_date: string;
+  chief_complaint: string;
+  diagnosis: any[];
+  treatment_plan: string;
+  source: 'current' | 'external';
+  hospital_name: string;
+  city?: string;
+  doctor_name: string;
+  doctor_specialty?: string;
+}
+
+export interface UnifiedHistoryResponse {
+  success: boolean;
+  data: {
+    encounters: UnifiedEncounter[];
+    total: number;
+    globalPatientId: string;
+    requestingHospitalId: string;
+  };
+}
+
+// 1. Register New Global Patient
+export const registerGlobalPatient = async (data: GlobalPatientRegistrationRequest) => {
+  return apiClient.post('/patients/global', data);
 };
+
+// 2. Search Global Patients - See newer implementation above (searchGlobalPatients)
+// DEPRECATED: Use searchGlobalPatients from the Global Patient Search section
+
+// 3. Get Global Patient by MID
+export const getGlobalPatientByMid = async (mid: string) => {
+  return apiClient.get<{ success: boolean; data: GlobalPatient }>(`/patients/global/${mid}`);
+};
+
+// 4. Enroll Patient at Hospital - See newer implementation above (enrollGlobalPatient)
+// DEPRECATED: Use enrollGlobalPatient from the Global Patient Search section
+
+// 5. Get Patient Network Status
+export const getPatientNetworkStatus = async (mid: string) => {
+  return apiClient.get(`/patients/global/${mid}/network`);
+};
+
+// 6. Get Unified Medical History
+export const getUnifiedPatientHistory = async (globalPatientId: string, hospitalId: string) => {
+  return apiClient.get<UnifiedHistoryResponse>(`/encounters/history/${globalPatientId}`, {
+    params: { hospitalId }
+  });
+};
+
+// 7. Download Prescription PDF
+export const downloadPrescriptionPDF = async (prescriptionId: string) => {
+  const response = await apiClient.get(`/prescriptions/${prescriptionId}/download`, {
+    responseType: 'blob'
+  });
+  
+  // Create a blob link to download
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `prescription-${prescriptionId}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
+// 8. View Prescription PDF (Inline)
+export const viewPrescriptionPDF = (prescriptionId: string) => {
+  return `${API_BASE_URL}/prescriptions/${prescriptionId}/view`;
+};
+
+
 
 export interface PatientProfile {
   id: string;
   fullName: string;
   uhid: string;
+  mid?: string; // MedMitra ID - universal patient identifier
   email?: string;
   phone?: string;
   dateOfBirth?: string;
@@ -912,7 +1314,7 @@ export const patientLogin = async (data: { username: string; password: string; }
   return apiClient.post(`/auth/login`, data);
 };
 
-export const patientRegister = async (data: { username: string; email: string; password: string; }) => {
+export const patientRegister = async (data: { username: string; email: string; phone: string; password: string; }) => {
   return apiClient.post(`/auth/register`, { ...data, role: 'patient' });
 };
 
@@ -1288,6 +1690,7 @@ export interface CoordinatorPatientsResponse {
       id: string;
       fullName: string;
       uhid: string;
+      mid?: string;
       email?: string;
       phoneNumber?: string;
       dateOfBirth?: string;
@@ -1564,4 +1967,241 @@ export const getCoordinatorRecentActivity = async (
 // Get appointment trends
 export const getCoordinatorAppointmentTrends = async (): Promise<AxiosResponse<{ success: boolean; data: { trends: CoordinatorAppointmentTrend[] } }>> => {
   return apiClient.get('/coordinator/dashboard/appointment-trends', { headers: getCoordinatorAuthHeaders() });
+};
+
+// ============================================
+// Patient Self-Service API Functions
+// ============================================
+
+export interface PatientProfile {
+  id: string;
+  fullName: string;
+  uhid: string;
+  email?: string;
+  phone?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  bloodType?: string;
+  allergies?: string[];
+  address?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  };
+  emergencyContact?: {
+    name?: string;
+    phone?: string;
+    relation?: string;
+  };
+  insurance?: {
+    provider?: string;
+    policyNumber?: string;
+    groupNumber?: string;
+  };
+}
+
+// Get patient profile
+export const getPatientProfile = async (): Promise<AxiosResponse<{ status: string; data: PatientProfile & { needsProfileCompletion?: boolean } }>> => {
+  return apiClient.get('/patients/me/profile');
+};
+
+// Update patient profile (for onboarding)
+export interface UpdateProfileData {
+  fullName?: string;  // Optional - backend uses existing if not provided
+  phone?: string;     // Optional - backend uses existing if not provided
+  dateOfBirth: string;
+  gender: string;
+  bloodType?: string;
+  allergies?: string[];
+  chronicConditions?: string[];
+}
+
+export const updatePatientProfile = async (data: UpdateProfileData): Promise<AxiosResponse<{ status: string; message: string; data: PatientProfile }>> => {
+  return apiClient.put('/patients/me/profile', data);
+};
+
+// Get upcoming appointments
+export const getPatientUpcomingAppointments = async (): Promise<AxiosResponse<{ status: string; data: PatientAppointment[] }>> => {
+  return apiClient.get('/patients/me/appointments');
+};
+
+// Get all appointments
+export const getPatientAllAppointments = async (): Promise<AxiosResponse<{ status: string; data: PatientAppointment[] }>> => {
+  return apiClient.get('/patients/me/appointments/all');
+};
+
+// Get prescriptions
+export const getPatientPrescriptions = async (): Promise<AxiosResponse<{ status: string; data: PatientPrescription[] }>> => {
+  return apiClient.get('/patients/me/prescriptions');
+};
+
+// Get recent activity
+export const getPatientRecentActivity = async (): Promise<AxiosResponse<{ status: string; data: any[] }>> => {
+  return apiClient.get('/patients/me/activity');
+};
+
+// ============================================
+// Patient Dashboard Widget APIs
+// ============================================
+
+export interface NextAppointmentData {
+  appointmentId: string;
+  scheduledTime: string;
+  appointmentType: string;
+  status: string;
+  notes?: string;
+  doctor: {
+    id?: string;
+    fullName: string;
+    specialty?: string;
+  };
+  hospital: {
+    id?: string;
+    name: string;
+    address?: string;
+    city?: string;
+  };
+}
+
+export interface ActivityFeedItem {
+  id: string;
+  type: 'consultation' | 'prescription' | 'appointment';
+  icon: string;
+  title: string;
+  subtitle: string;
+  hospitalName: string;
+  date: string;
+  relativeTime: string;
+  link: string;
+}
+
+// Get next upcoming appointment (for dashboard widget)
+export const getPatientNextAppointment = async (): Promise<AxiosResponse<{ status: string; data: NextAppointmentData | null }>> => {
+  return apiClient.get('/patients/me/next-appointment');
+};
+
+// Get activity feed (multi-hospital)
+export const getPatientActivityFeed = async (limit: number = 5): Promise<AxiosResponse<{ status: string; data: ActivityFeedItem[] }>> => {
+  return apiClient.get('/patients/me/activity-feed', { params: { limit } });
+};
+
+// ============================================
+// Medical History Timeline APIs (Phase 4)
+// ============================================
+
+export interface MedicalHistoryItem {
+  encounterId: string;
+  date: string;
+  chiefComplaint: string;
+  diagnosis?: string;
+  vitals?: Record<string, any>;
+  advice?: string;
+  status: string;
+  hospital?: {
+    id: string;
+    name: string;
+    city?: string;
+  };
+  doctor?: {
+    fullName: string;
+    specialty?: string;
+  };
+}
+
+// Get medical history (unified timeline across all hospitals)
+export const getMedicalHistory = async (): Promise<AxiosResponse<{ status: string; data: MedicalHistoryItem[] }>> => {
+  return apiClient.get('/patients/me/medical-history');
+};
+
+// ============================================
+// Doctor Discovery & Booking APIs
+// ============================================
+
+export interface Hospital {
+  id: string;
+  name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  phone?: string;
+  email?: string;
+  doctorCount?: number;
+}
+
+export interface DoctorCard {
+  id: string;
+  fullName: string;
+  specialty?: string;
+  experience?: number;
+  profileImage?: string;
+  hospital: {
+    id: string;
+    name: string;
+    city?: string;
+  };
+  nextAvailable?: string;
+}
+
+export interface AvailableSlot {
+  time: string;
+  display: string;
+}
+
+export interface AvailableDate {
+  date: string;
+  dayName: string;
+  dayNumber: number;
+  month: string;
+  isToday: boolean;
+}
+
+export interface BookingConfirmation {
+  appointmentId: string;
+  scheduledTime: string;
+  appointmentType: string;
+  status: string;
+  doctor: {
+    id: string;
+    fullName: string;
+    specialty?: string;
+  };
+  hospital: {
+    id: string;
+    name: string;
+    address?: string;
+    city?: string;
+  };
+}
+
+// Get all hospitals
+export const getHospitals = async (): Promise<AxiosResponse<{ status: string; data: Hospital[] }>> => {
+  return apiClient.get('/patients/hospitals');
+};
+
+// Get doctors at a hospital
+export const getDoctorsByHospital = async (hospitalId: string, specialty?: string): Promise<AxiosResponse<{ status: string; data: DoctorCard[] }>> => {
+  const params = specialty ? { specialty } : {};
+  return apiClient.get(`/patients/hospitals/${hospitalId}/doctors`, { params });
+};
+
+// Search doctors (across all hospitals)
+export const searchDoctors = async (query?: string, specialty?: string, hospitalId?: string): Promise<AxiosResponse<{ status: string; data: DoctorCard[] }>> => {
+  return apiClient.get('/patients/doctors/search', { params: { query, specialty, hospitalId } });
+};
+
+// Get available specialties
+export const getSpecialties = async (): Promise<AxiosResponse<{ status: string; data: string[] }>> => {
+  return apiClient.get('/patients/specialties');
+};
+
+// Get doctor availability (dates and slots)
+export const getDoctorAvailability = async (doctorId: string, hospitalId: string, date?: string): Promise<AxiosResponse<{ status: string; data: { dates: AvailableDate[]; slots: AvailableSlot[] } }>> => {
+  return apiClient.get(`/patients/doctors/${doctorId}/availability`, { params: { hospitalId, date } });
+};
+
+// Book appointment
+export const bookPatientAppointment = async (data: { doctorId: string; hospitalId: string; scheduledTime: string; appointmentType?: string }): Promise<AxiosResponse<{ status: string; message: string; data: BookingConfirmation }>> => {
+  return apiClient.post('/patients/appointments', data);
 };

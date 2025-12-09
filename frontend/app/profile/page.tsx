@@ -106,12 +106,12 @@ export default function ProfilePage() {
           specialty: doctorData.specialty || "",
           phoneNumber: doctorData.phoneNumber || "",
           experience: doctorData.experience || 0,
-          address: doctorData.address || {
-            street: "",
-            city: "",
-            state: "",
-            zipCode: "",
-            country: "India"
+          address: {
+            street: doctorData.address?.street || "",
+            city: doctorData.address?.city || "",
+            state: doctorData.address?.state || "",
+            zipCode: doctorData.address?.zipCode || "",
+            country: doctorData.address?.country || "India"
           },
           qualifications: doctorData.qualifications || []
         });
@@ -153,12 +153,12 @@ export default function ProfilePage() {
         specialty: profile.specialty || "",
         phoneNumber: profile.phoneNumber || "",
         experience: profile.experience || 0,
-        address: profile.address || {
-          street: "",
-          city: "",
-          state: "",
-          zipCode: "",
-          country: "India"
+        address: {
+          street: profile.address?.street || "",
+          city: profile.address?.city || "",
+          state: profile.address?.state || "",
+          zipCode: profile.address?.zipCode || "",
+          country: profile.address?.country || "India"
         },
         qualifications: profile.qualifications || []
       });

@@ -41,25 +41,25 @@ const navLinks: NavLink[] = [
 const portalLinks: PortalLink[] = [
   {
     name: "Doctor Portal",
-    href: "/doctor/login",
+    href: "/doctor",
     icon: <User className="w-4 h-4" />,
     description: "Access your clinical dashboard",
   },
   {
     name: "Patient Portal",
-    href: "/patient/login",
+    href: "/patient",
     icon: <Users className="w-4 h-4" />,
     description: "View your health records",
   },
   {
     name: "Coordinator Access",
-    href: "/coordinator/login",
+    href: "/coordinator",
     icon: <UserCog className="w-4 h-4" />,
     description: "Manage appointments",
   },
   {
     name: "Admin Panel",
-    href: "/admin/login",
+    href: "/admin",
     icon: <Shield className="w-4 h-4" />,
     description: "System administration",
   },

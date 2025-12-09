@@ -6,7 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import Header from "@/components/dashboard/Header";
 import EncounterForm from "@/components/encounter/EncounterForm";
 import AIAssistantWidget from "@/components/encounter/AIAssistantWidget";
-import PatientHistoryWidget from "@/components/encounter/PatientHistoryWidget";
+import VitalsDisplay from "@/components/encounter/VitalsDisplay";
+import HistoryTimeline from "@/components/encounter/HistoryTimeline";
 import ExistingPrescriptions from "@/components/encounter/ExistingPrescriptions";
 import { getEncounterDetails } from "@/lib/api";
 
@@ -53,7 +54,7 @@ export default function EncounterPage() {
       } catch (err: any) {
         console.error("Error loading encounter:", err);
         if (err?.response?.status === 401) {
-          router.push("/login");
+          router.push("/doctor/login");
         } else if (err?.response?.status === 404) {
           setError("Appointment not found");
         } else {
@@ -132,7 +133,14 @@ export default function EncounterPage() {
       </div>
 
       <main className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Vitals Display - from Triage */}
+          <VitalsDisplay 
+            vitals={bundle.vitals || bundle.encounterForm?.vitalSigns || null}
+            onEdit={() => console.log('Edit vitals')}
+          />
+          
+          {/* Main Encounter Form */}
           <EncounterForm
             data={bundle.encounterForm}
             encounterId={bundle.encounter?.id}
@@ -141,14 +149,18 @@ export default function EncounterPage() {
             patientId={patient.id}
             patient={patient}
           />
+          
           {/* Existing Prescriptions Section */}
           {bundle.encounter?.id && (
             <ExistingPrescriptions encounterId={bundle.encounter.id} />
           )}
         </div>
-        <div className="lg:col-span-1 flex flex-col gap-8">
+        <div className="lg:col-span-1 flex flex-col gap-6">
           <AIAssistantWidget data={bundle.aiAnalysis} />
-          <PatientHistoryWidget data={bundle.medicalHistory} />
+          <HistoryTimeline 
+            history={bundle.medicalHistory || []}
+            onViewDetails={(id) => router.push(`/encounter/${id}`)}
+          />
         </div>
       </main>
     </div>

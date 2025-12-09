@@ -46,7 +46,7 @@ export default function PatientRegisterPage() {
                   transition={{ duration: 0.6 }}
                 >
                   <GradientText
-                    variants="lavender"
+                    gradient="lavender"
                     className="text-4xl md:text-5xl font-bold mb-4"
                   >
                     Patient Registration

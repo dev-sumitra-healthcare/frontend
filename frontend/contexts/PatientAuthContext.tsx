@@ -29,6 +29,7 @@ interface PatientAuthContextType {
 interface RegisterData {
   username: string;
   email: string;
+  phone: string;
   password: string;
 }
 
@@ -48,8 +49,18 @@ export function PatientAuthProvider({ children }: { children: React.ReactNode })
       const storedUser = localStorage.getItem('patientUser');
 
       if (token && storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        
+        // Strict role check to prevent cross-role login issues
+        if (parsedUser.role !== 'patient') {
+           console.warn('Invalid role found in patient storage, clearing...');
+           localStorage.removeItem('patientAccessToken');
+           localStorage.removeItem('patientUser');
+           return;
+        }
+
         setAccessToken(token);
-        setUser(JSON.parse(storedUser));
+        setUser(parsedUser);
       }
     } catch (error) {
       console.error('Patient auth check error:', error);
@@ -74,6 +85,11 @@ export function PatientAuthProvider({ children }: { children: React.ReactNode })
 
       if (response.data?.accessToken && response.data?.user) {
         const { accessToken: token, user: patient } = response.data;
+
+        // Verify role before setting state
+        if (patient.role !== 'patient') {
+          throw new Error('Access denied. This account is not a patient account.');
+        }
 
         // Store in localStorage
         localStorage.setItem('patientAccessToken', token);

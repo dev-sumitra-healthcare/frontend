@@ -93,14 +93,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { accessToken: token, doctor } = response.data.data;
 
         // Normalize doctor data (handle both camelCase and snake_case)
+        const doctorData = doctor as any;
         const normalizedDoctor = {
           ...doctor,
-          fullName: doctor.full_name || doctor.fullName,
-          medicalRegistrationId: doctor.medical_registration_id || doctor.medicalRegistrationId,
-          accountStatus: doctor.account_status || doctor.accountStatus,
-          phoneNumber: doctor.phone_number || doctor.phoneNumber,
-          isVerified: doctor.is_verified !== undefined ? doctor.is_verified : doctor.isVerified,
-          lastLogin: doctor.last_login || doctor.lastLogin,
+          id: doctorData._id || doctorData.id,
+          fullName: doctorData.full_name || doctorData.fullName,
+          medicalRegistrationId: doctorData.medical_registration_id || doctorData.medicalRegistrationId,
+          accountStatus: doctorData.account_status || doctorData.accountStatus,
+          phoneNumber: doctorData.phone_number || doctorData.phoneNumber,
+          isVerified: doctorData.is_verified !== undefined ? doctorData.is_verified : doctorData.isVerified,
+          lastLogin: doctorData.last_login || doctorData.lastLogin,
         };
 
         // Store in localStorage
@@ -112,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(normalizedDoctor);
 
         // Navigate to dashboard
-        router.replace('/dashboard');
+        router.replace('/doctor/dashboard');
       } else {
         throw new Error('Invalid response structure from server');
       }
@@ -177,8 +179,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setError(null);
 
-      // Redirect to login
-      router.replace('/login');
+      // Redirect to doctor login
+      router.replace('/doctor/login');
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
@@ -192,9 +194,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await getDoctorProfile();
       
       if (response.data?.data?.doctor) {
-        const doctor = response.data.data.doctor;
-        localStorage.setItem('user', JSON.stringify(doctor));
-        setUser(doctor);
+        const doctor = response.data.data.doctor as any;
+        const normalized = {
+          ...doctor,
+          id: doctor._id || doctor.id,
+        };
+        localStorage.setItem('user', JSON.stringify(normalized));
+        setUser(normalized);
       }
     } catch (err) {
       console.error('Failed to refresh user data:', err);

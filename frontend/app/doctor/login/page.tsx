@@ -44,7 +44,7 @@ export default function DoctorLoginPage() {
                   transition={{ duration: 0.6 }}
                 >
                   <GradientText
-                    variant="primary"
+                    gradient="primary"
                     className="text-4xl md:text-5xl font-bold mb-4"
                   >
                     Doctor Portal

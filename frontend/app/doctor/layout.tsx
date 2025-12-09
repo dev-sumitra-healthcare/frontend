@@ -13,7 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 
 // Pages that should NOT have the sidebar (public/auth pages)
+// Exact match for /doctor landing page, prefix match for /doctor/login and /doctor/register
 const PUBLIC_ROUTES = ['/doctor/login', '/doctor/register'];
+const EXACT_PUBLIC_ROUTES = ['/doctor'];
 
 export default function DoctorLayout({
   children,
@@ -23,9 +25,10 @@ export default function DoctorLayout({
   const pathname = usePathname();
 
   // Check if current route is a public route (no sidebar needed)
-  const isPublicRoute = PUBLIC_ROUTES.some(route => pathname?.startsWith(route));
+  const isPublicRoute = PUBLIC_ROUTES.some(route => pathname?.startsWith(route)) ||
+    EXACT_PUBLIC_ROUTES.includes(pathname || '');
 
-  // For public routes (login/register), render children without sidebar
+  // For public routes (login/register/landing), render children without sidebar
   if (isPublicRoute) {
     return <>{children}</>;
   }

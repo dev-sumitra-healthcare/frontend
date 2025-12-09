@@ -3,33 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, Pill, Calendar, User, AlertCircle, Loader2, Activity, FlaskConical } from 'lucide-react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
-import { getMyPrescriptions, getMyProfile, PatientProfile } from '@/lib/api';
+import { getMyPrescriptions, getMyProfile, PatientProfile, type PatientPrescription } from '@/lib/api';
 import { PrescriptionPDF } from '@/components/prescriptions/PrescriptionPDF';
 
-interface Prescription {
-  prescriptionId: string;
-  encounterId: string;
-  date: string;
-  encounterDate?: string;
-  chiefComplaint?: string;
-  doctor: {
-    fullName: string;
-    specialty: string | null;
-  };
-  medications: Array<{
-    name: string;
-    dosage: string;
-    frequency: string;
-    duration: string;
-    instructions?: string;
-  }>;
-  advice: string | null;
-  tests: Array<{
-    name: string;
-    instructions?: string;
-  }>;
-  followUp: string | null;
-}
+// Use the shared type from api.ts
+type Prescription = PatientPrescription;
 
 export default function PatientPrescriptionsWidget() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
@@ -126,34 +104,34 @@ export default function PatientPrescriptionsWidget() {
             <PDFDownloadLink
               document={
                 <PrescriptionPDF
-                  patientName={patientProfile?.fullName || "Patient"}
+                  patientName={patientProfile?.fullName || 'Patient'}
                   patientAge={patientProfile?.dateOfBirth ? calculateAge(patientProfile.dateOfBirth) : undefined}
                   patientGender={patientProfile?.gender}
                   patientUHID={patientProfile?.uhid}
                   date={prescription.date}
                   doctorName={prescription.doctor.fullName}
-                  doctorQualification={undefined}
-                  doctorRegistration={undefined}
-                  clinicName="MedMitra Health Services"
-                  clinicAddress={undefined}
-                  clinicPhone={undefined}
                   medications={prescription.medications}
-                  advice={prescription.advice || undefined}
+                  advice={prescription.advice}
                   tests={prescription.tests}
-                  followUp={prescription.followUp || undefined}
+                  followUp={prescription.followUp}
                 />
               }
-              fileName={`Prescription_${formatDate(prescription.date).replace(/\s/g, '_')}.pdf`}
+              fileName={`prescription_${formatDate(prescription.date).replace(/\s/g, '_')}.pdf`}
+              className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
             >
-              {({ loading }) => (
-                <button
-                  disabled={loading}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Download className="w-4 h-4" />
-                  {loading ? 'Generating...' : 'Download'}
-                </button>
-              )}
+              {({ loading }) =>
+                loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Download PDF
+                  </>
+                )
+              }
             </PDFDownloadLink>
           </div>
 
@@ -191,7 +169,7 @@ export default function PatientPrescriptionsWidget() {
                 {hasTests && (
                   <span className="flex items-center gap-1">
                     <FlaskConical className="w-4 h-4" />
-                    {prescription.tests.length} test{prescription.tests.length !== 1 ? 's' : ''}
+                    {prescription.tests?.length} test{prescription.tests?.length !== 1 ? 's' : ''}
                   </span>
                 )}
                 {!hasMedications && !hasTests && (
@@ -247,7 +225,7 @@ export default function PatientPrescriptionsWidget() {
                     Laboratory Tests
                   </h4>
                   <div className="space-y-2">
-                    {prescription.tests.map((test, idx) => (
+                    {prescription.tests?.map((test, idx) => (
                       <div key={idx} className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                         <p className="font-medium text-gray-900 text-sm">{test.name}</p>
                         {test.instructions && (

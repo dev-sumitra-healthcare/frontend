@@ -438,7 +438,7 @@ export default function CoordinatorRegister() {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs sm:text-sm">
             <a
-              href="/login"
+              href="/doctor/login"
               className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline font-medium"
             >
               Doctor Login

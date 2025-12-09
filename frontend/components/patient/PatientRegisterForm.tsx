@@ -11,13 +11,14 @@ import { GlassCard } from '@/components/glass/GlassCard';
 import { GlassInput } from '@/components/glass/GlassInput';
 import { GradientText } from '@/components/gradient/GradientText';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { Mail, Lock, Eye, EyeOff, UserRound, HeartPulse, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, UserRound, HeartPulse, Loader2, AlertCircle, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
 const PatientRegisterSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),
   email: z.string().email('Valid email required'),
+  phone: z.string().min(10, 'Valid phone number required (min 10 digits)').regex(/^[+]?[0-9\s-]+$/, 'Invalid phone format'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
 }).refine((v) => v.password === v.confirmPassword, {
@@ -41,7 +42,7 @@ export default function PatientRegisterForm() {
 
   const form = useForm<z.infer<typeof PatientRegisterSchema>>({
     resolver: zodResolver(PatientRegisterSchema),
-    defaultValues: { username: '', email: '', password: '', confirmPassword: '' },
+    defaultValues: { username: '', email: '', phone: '', password: '', confirmPassword: '' },
   });
 
   const onSubmit = async (values: z.infer<typeof PatientRegisterSchema>) => {
@@ -161,6 +162,28 @@ export default function PatientRegisterForm() {
                       type="email"
                       placeholder="patient@example.com"
                       icon={Mail}
+                      className="h-12"
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )} />
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.45 }}
+            >
+              <FormField name="phone" control={form.control} render={({ field }) => (
+                <FormItem className="space-y-2">
+                  <FormLabel className="text-sm font-medium text-ocean-deep dark:text-gray-200">Phone Number</FormLabel>
+                  <FormControl>
+                    <GlassInput
+                      {...field}
+                      type="tel"
+                      placeholder="+91 98765 43210"
+                      icon={Phone}
                       className="h-12"
                     />
                   </FormControl>

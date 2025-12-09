@@ -8,7 +8,12 @@ import {
   getCoordinatorPatientById,
   updateCoordinatorPatient,
   deleteCoordinatorPatient,
+  searchGlobalPatients,
+  enrollGlobalPatient,
+  registerGlobalPatient,
+  getUnifiedPatientHistory,
   type CoordinatorPatientsResponse,
+  type GlobalPatient,
 } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,6 +50,7 @@ import {
   Hash,
   Home,
   Map,
+  Loader2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -65,6 +71,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AddPatientWizard } from "@/components/coordinator/add-patient-wizard";
 
 // Derive Patient type from API response
 type Patient = CoordinatorPatientsResponse["data"]["results"][number];
@@ -152,12 +159,68 @@ export default function CoordinatorPatients() {
 
   const totalPages = Math.ceil(total / limit);
 
+  // Universal Search State
+  const [universalSearchOpen, setUniversalSearchOpen] = useState(false);
+  const [universalSearchQuery, setUniversalSearchQuery] = useState("");
+  const [universalSearchResults, setUniversalSearchResults] = useState<GlobalPatient[]>([]);
+  const [universalSearchLoading, setUniversalSearchLoading] = useState(false);
+  const [enrollLoading, setEnrollLoading] = useState(false);
+
+  const handleUniversalSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!universalSearchQuery.trim()) return;
+    
+    try {
+      setUniversalSearchLoading(true);
+      const response = await searchGlobalPatients(universalSearchQuery);
+      if (response.data.success) {
+        setUniversalSearchResults(response.data.data.results);
+      }
+    } catch (err) {
+      console.error("Universal search failed:", err);
+    } finally {
+      setUniversalSearchLoading(false);
+    }
+  };
+
+  const handleEnroll = async (patient: GlobalPatient) => {
+    try {
+      setEnrollLoading(true);
+      // Get hospital ID from coordinator data in localStorage
+      const coordinatorData = localStorage.getItem('coordinatorData');
+      if (!coordinatorData) throw new Error("Coordinator data not found");
+      
+      const { hospitalId } = JSON.parse(coordinatorData);
+      
+      await enrollGlobalPatient(patient.mid, { hospitalId });
+      
+      setUniversalSearchOpen(false);
+      setUniversalSearchResults([]);
+      setUniversalSearchQuery("");
+      // Refresh patient list
+      loadPatients();
+      alert(`Patient ${patient.fullName} enrolled successfully!`);
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Failed to enroll patient");
+    } finally {
+      setEnrollLoading(false);
+    }
+  };
+
   const openCreateDialog = () => {
+    // Reset states
+    setUniversalSearchQuery("");
+    setUniversalSearchResults([]);
+    setUniversalSearchOpen(true);
+  };
+
+  const proceedToCreateNew = () => {
+    setUniversalSearchOpen(false);
     setCreateError("");
     setForm({
       fullName: "",
       email: "",
-      phone: "",
+      phone: universalSearchQuery.match(/^\d+$/) ? universalSearchQuery : "", // Pre-fill phone if query was digits
       dateOfBirth: "",
       gender: "",
       city: "",
@@ -177,8 +240,15 @@ export default function CoordinatorPatients() {
         return;
       }
       setCreating(true);
+      
+      // Get hospital ID
+      const coordinatorData = localStorage.getItem('coordinatorData');
+      if (!coordinatorData) throw new Error("Coordinator data not found");
+      const { hospitalId } = JSON.parse(coordinatorData);
+
       const payload: any = {
         fullName: form.fullName,
+        hospitalId,
         ...(form.email ? { email: form.email } : {}),
         ...(form.phone ? { phone: form.phone } : {}),
         ...(form.dateOfBirth ? { dateOfBirth: form.dateOfBirth } : {}),
@@ -188,7 +258,10 @@ export default function CoordinatorPatients() {
         ...(form.pincode ? { pincode: form.pincode } : {}),
         ...(form.bloodGroup ? { bloodGroup: form.bloodGroup } : {}),
       };
-      await createCoordinatorPatient(payload);
+      
+      // Use new Universal ID registration
+      await registerGlobalPatient(payload);
+      
       setCreateOpen(false);
       // Remove action param if present
       if (action === "create") {
@@ -226,6 +299,29 @@ export default function CoordinatorPatients() {
       setViewError(e?.response?.data?.message || "Failed to load patient");
     } finally {
       setViewLoading(false);
+    }
+  };
+
+  // Unified History State
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyData, setHistoryData] = useState<any[]>([]);
+
+  const loadHistory = async (patientId: string) => {
+    try {
+      setHistoryLoading(true);
+      // Get hospital ID
+      const coordinatorData = localStorage.getItem('coordinatorData');
+      if (!coordinatorData) return;
+      const { hospitalId } = JSON.parse(coordinatorData);
+      
+      const response = await getUnifiedPatientHistory(patientId, hospitalId);
+      if (response.data.success) {
+        setHistoryData(response.data.data.encounters);
+      }
+    } catch (err) {
+      console.error("Failed to load history:", err);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -341,7 +437,6 @@ export default function CoordinatorPatients() {
 
   return (
     <div>
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">All Patients</h1>
@@ -349,10 +444,9 @@ export default function CoordinatorPatients() {
             Hospital-wide patient roster • {total} total patients
           </p>
         </div>
-        <Button className="mt-4 md:mt-0" onClick={openCreateDialog}>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Add New Patient
-        </Button>
+        <div className="mt-4 md:mt-0">
+          <AddPatientWizard />
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -421,6 +515,7 @@ export default function CoordinatorPatients() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>MedMitra ID</TableHead>
                       <TableHead>UHID</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Contact</TableHead>
@@ -434,6 +529,9 @@ export default function CoordinatorPatients() {
                     {patients.map((patient) => (
                       <TableRow key={patient.id}>
                         <TableCell className="font-medium">
+                          {patient.mid || "-"}
+                        </TableCell>
+                        <TableCell className="text-gray-500">
                           {patient.uhid}
                         </TableCell>
                         <TableCell>
@@ -567,6 +665,67 @@ export default function CoordinatorPatients() {
           )}
         </CardContent>
       </Card>
+
+      {/* Universal Search Dialog */}
+      <Dialog open={universalSearchOpen} onOpenChange={setUniversalSearchOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Universal Patient Search</DialogTitle>
+            <DialogDescription>
+              Search for an existing patient in the MedMitra network using their Phone Number or MedMitra ID.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleUniversalSearch} className="space-y-4 mt-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter Phone Number or MedMitra ID"
+                value={universalSearchQuery}
+                onChange={(e) => setUniversalSearchQuery(e.target.value)}
+                className="flex-1"
+              />
+              <Button type="submit" disabled={universalSearchLoading}>
+                {universalSearchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
+              </Button>
+            </div>
+          </form>
+
+          <div className="mt-6 space-y-4">
+            {universalSearchResults.length > 0 ? (
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium text-gray-500">Search Results</h4>
+                {universalSearchResults.map((patient) => (
+                  <div key={patient.id} className="flex items-center justify-between p-4 border rounded-lg bg-gray-50 dark:bg-gray-900/50">
+                    <div>
+                      <p className="font-medium text-lg">{patient.fullName}</p>
+                      <div className="text-sm text-gray-500 space-y-1">
+                        <p>MID: {patient.mid}</p>
+                        <p>Phone: {patient.phone}</p>
+                        <p>DOB: {patient.dateOfBirth ? new Date(patient.dateOfBirth).toLocaleDateString() : 'N/A'}</p>
+                      </div>
+                    </div>
+                    <Button 
+                      onClick={() => handleEnroll(patient)} 
+                      disabled={enrollLoading}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {enrollLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
+                      Enroll Here
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : universalSearchQuery && !universalSearchLoading ? (
+              <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed">
+                <p className="text-gray-500 mb-4">No patient found with these details.</p>
+                <Button onClick={proceedToCreateNew} variant="outline">
+                  Create New Patient Record
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Patient Dialog - Improved UI */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -853,154 +1012,215 @@ export default function CoordinatorPatients() {
               <AlertDescription>{viewError}</AlertDescription>
             </Alert>
           ) : viewPatient ? (
-            <div className="space-y-6 py-4">
-              {/* Patient Header */}
-              <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
-                <Avatar className="h-16 w-16">
-                  <AvatarFallback className="text-xl bg-blue-200">
-                    {(viewPatient.fullName || viewPatient.full_name || "P")[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="text-xl font-semibold">
-                    {viewPatient.fullName || viewPatient.full_name}
-                  </h3>
-                  <div className="flex items-center gap-3 mt-1">
-                    <Badge
-                      variant="outline"
-                      className="flex items-center gap-1"
-                    >
-                      <CreditCard className="h-3 w-3" />
-                      {viewPatient.uhid}
-                    </Badge>
-                    {viewPatient.dateOfBirth && (
-                      <span className="text-sm text-gray-600">
-                        Age: {calculateAge(viewPatient.dateOfBirth)} years
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
+            <Tabs defaultValue="details" className="w-full" onValueChange={(v) => v === 'history' && viewPatient && loadHistory(viewPatient.id)}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="details">Patient Details</TabsTrigger>
+                <TabsTrigger value="history">Unified Medical History</TabsTrigger>
+              </TabsList>
 
-              {/* Information Grid */}
-              <div className="grid gap-4">
-                {/* Personal Information */}
-                <div className="border rounded-lg p-4 space-y-3">
-                  <h4 className="font-medium text-sm text-gray-600 flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Personal Information
-                  </h4>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    {viewPatient.gender && (
-                      <div>
-                        <span className="text-gray-500">Gender:</span>
-                        <span className="ml-2 font-medium">
-                          {viewPatient.gender}
-                        </span>
-                      </div>
-                    )}
-                    {viewPatient.dateOfBirth && (
-                      <div>
-                        <span className="text-gray-500">Date of Birth:</span>
-                        <span className="ml-2 font-medium">
-                          {new Date(
-                            viewPatient.dateOfBirth
-                          ).toLocaleDateString()}
-                        </span>
-                      </div>
-                    )}
-                    {(viewPatient.bloodType ||
-                      viewPatient.blood_group ||
-                      viewPatient.bloodGroup) && (
-                      <div className="col-span-2">
-                        <span className="text-gray-500">Blood Group:</span>
-                        <Badge variant="secondary" className="ml-2">
-                          {viewPatient.bloodType ||
-                            viewPatient.blood_group ||
-                            viewPatient.bloodGroup}
+              <TabsContent value="details" className="space-y-6 py-4">
+                {/* Patient Header */}
+                <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
+                  <Avatar className="h-16 w-16">
+                    <AvatarFallback className="text-xl bg-blue-200">
+                      {(viewPatient.fullName || viewPatient.full_name || "P")[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="text-xl font-semibold">
+                      {viewPatient.fullName || viewPatient.full_name}
+                    </h3>
+                    <div className="flex items-center gap-3 mt-1">
+                      <Badge
+                        variant="outline"
+                        className="flex items-center gap-1"
+                      >
+                        <CreditCard className="h-3 w-3" />
+                        {viewPatient.uhid}
+                      </Badge>
+                      {viewPatient.mid && (
+                        <Badge variant="default" className="bg-purple-600 hover:bg-purple-700">
+                          MID: {viewPatient.mid}
                         </Badge>
-                      </div>
-                    )}
+                      )}
+                      {viewPatient.dateOfBirth && (
+                        <span className="text-sm text-gray-600">
+                          Age: {calculateAge(viewPatient.dateOfBirth)} years
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Contact Information */}
-                {(viewPatient.email ||
-                  viewPatient.phone ||
-                  viewPatient.phoneNumber) && (
+                {/* Information Grid */}
+                <div className="grid gap-4">
+                  {/* Personal Information */}
                   <div className="border rounded-lg p-4 space-y-3">
                     <h4 className="font-medium text-sm text-gray-600 flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      Contact Information
+                      <User className="h-4 w-4" />
+                      Personal Information
                     </h4>
-                    <div className="space-y-2 text-sm">
-                      {viewPatient.email && (
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-gray-400" />
-                          <span className="font-medium">
-                            {viewPatient.email}
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      {viewPatient.gender && (
+                        <div>
+                          <span className="text-gray-500">Gender:</span>
+                          <span className="ml-2 font-medium">
+                            {viewPatient.gender}
                           </span>
                         </div>
                       )}
-                      {(viewPatient.phone || viewPatient.phoneNumber) && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-gray-400" />
-                          <span className="font-medium">
-                            {viewPatient.phone || viewPatient.phoneNumber}
+                      {viewPatient.dateOfBirth && (
+                        <div>
+                          <span className="text-gray-500">Date of Birth:</span>
+                          <span className="ml-2 font-medium">
+                            {new Date(
+                              viewPatient.dateOfBirth
+                            ).toLocaleDateString()}
                           </span>
+                        </div>
+                      )}
+                      {(viewPatient.bloodType ||
+                        viewPatient.blood_group ||
+                        viewPatient.bloodGroup) && (
+                        <div className="col-span-2">
+                          <span className="text-gray-500">Blood Group:</span>
+                          <Badge variant="secondary" className="ml-2">
+                            {viewPatient.bloodType ||
+                              viewPatient.blood_group ||
+                              viewPatient.bloodGroup}
+                          </Badge>
                         </div>
                       )}
                     </div>
                   </div>
-                )}
 
-                {/* Address Information */}
-                {(viewPatient.address_city ||
-                  viewPatient.address?.city ||
-                  viewPatient.city) && (
-                  <div className="border rounded-lg p-4 space-y-3">
-                    <h4 className="font-medium text-sm text-gray-600 flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      Address
-                    </h4>
-                    <div className="text-sm">
-                      <span className="font-medium">
-                        {viewPatient.address_city ||
-                          viewPatient.address?.city ||
-                          viewPatient.city}
-                        {(viewPatient.address_state ||
-                          viewPatient.address?.state ||
-                          viewPatient.state) &&
-                          `, ${
-                            viewPatient.address_state ||
+                  {/* Contact Information */}
+                  {(viewPatient.email ||
+                    viewPatient.phone ||
+                    viewPatient.phoneNumber) && (
+                    <div className="border rounded-lg p-4 space-y-3">
+                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-2">
+                        <Phone className="h-4 w-4" />
+                        Contact Information
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        {viewPatient.email && (
+                          <div className="flex items-center gap-2">
+                            <Mail className="h-4 w-4 text-gray-400" />
+                            <span className="font-medium">
+                              {viewPatient.email}
+                            </span>
+                          </div>
+                        )}
+                        {(viewPatient.phone || viewPatient.phoneNumber) && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-gray-400" />
+                            <span className="font-medium">
+                              {viewPatient.phone || viewPatient.phoneNumber}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Address Information */}
+                  {(viewPatient.address_city ||
+                    viewPatient.address?.city ||
+                    viewPatient.city) && (
+                    <div className="border rounded-lg p-4 space-y-3">
+                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Address
+                      </h4>
+                      <div className="text-sm">
+                        <span className="font-medium">
+                          {viewPatient.address_city ||
+                            viewPatient.address?.city ||
+                            viewPatient.city}
+                          {(viewPatient.address_state ||
                             viewPatient.address?.state ||
-                            viewPatient.state
-                          }`}
-                      </span>
+                            viewPatient.state) &&
+                            `, ${
+                              viewPatient.address_state ||
+                              viewPatient.address?.state ||
+                              viewPatient.state
+                            }`}
+                        </span>
+                      </div>
                     </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-2 border-t">
+                  <Button variant="outline" onClick={() => setViewOpen(false)}>
+                    Close
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const p = patients.find((pat) => pat.id === viewPatient.id);
+                      if (p) {
+                        setViewOpen(false);
+                        openEdit(p);
+                      }
+                    }}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Patient
+                  </Button>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="history" className="space-y-4 py-4">
+                {historyLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                  </div>
+                ) : historyData.length > 0 ? (
+                  <div className="space-y-4">
+                    {historyData.map((encounter) => (
+                      <Card key={encounter.id} className="border-l-4 border-l-blue-500">
+                        <CardHeader className="py-3">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle className="text-base font-medium">
+                                {new Date(encounter.encounter_date).toLocaleDateString()} - {encounter.hospital_name}
+                              </CardTitle>
+                              <p className="text-sm text-gray-500">
+                                Dr. {encounter.doctor_name} • {encounter.doctor_specialty || 'General'}
+                              </p>
+                            </div>
+                            <Badge variant={encounter.source === 'current' ? 'default' : 'secondary'}>
+                              {encounter.source === 'current' ? 'This Hospital' : 'External'}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="py-3 text-sm space-y-2">
+                          <div>
+                            <span className="font-medium">Chief Complaint:</span> {encounter.chief_complaint}
+                          </div>
+                          {encounter.diagnosis && encounter.diagnosis.length > 0 && (
+                            <div>
+                              <span className="font-medium">Diagnosis:</span> {encounter.diagnosis.map((d: any) => d.name || d).join(', ')}
+                            </div>
+                          )}
+                          {encounter.treatment_plan && (
+                            <div>
+                              <span className="font-medium">Plan:</span> {encounter.treatment_plan}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed">
+                    <p className="text-gray-500">No medical history found for this patient.</p>
                   </div>
                 )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-3 pt-2 border-t">
-                <Button variant="outline" onClick={() => setViewOpen(false)}>
-                  Close
-                </Button>
-                <Button
-                  onClick={() => {
-                    const p = patients.find((pat) => pat.id === viewPatient.id);
-                    if (p) {
-                      setViewOpen(false);
-                      openEdit(p);
-                    }
-                  }}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Patient
-                </Button>
-              </div>
-            </div>
+              </TabsContent>
+            </Tabs>
           ) : null}
         </DialogContent>
       </Dialog>

@@ -17,3 +17,43 @@ export const AdminLoginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
 });
+
+export const PatientRegistrationSchema = z.object({
+  fullName: z.string().min(2, "Full name is required"),
+  phone: z.string().min(10, "Valid phone number is required"),
+  email: z.string().email("Invalid email address").optional().or(z.literal('')),
+  dateOfBirth: z.string().min(1, "Date of birth is required"),
+  gender: z.enum(["Male", "Female", "Other", "Prefer not to say"]),
+  bloodType: z.string().optional(),
+  allergies: z.string().optional(), // Comma separated string for input
+  address: z.object({
+    street: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    zipCode: z.string().optional(),
+  }).optional(),
+});
+
+export const EncounterFormSchema = z.object({
+  chiefComplaint: z.string().min(1, "Chief complaint is required"),
+  diagnosis: z.array(z.object({
+    id: z.string(),
+    name: z.string()
+  })).optional(),
+  medications: z.array(z.object({
+    name: z.string().min(1, "Drug name is required"),
+    dosage: z.string().min(1, "Dosage is required"),
+    frequency: z.string().min(1, "Frequency is required"),
+    duration: z.string().optional(),
+    instructions: z.string().optional(),
+  })).optional(),
+  notes: z.string().optional(),
+});
+
+export const AppointmentBookingSchema = z.object({
+  hospitalId: z.string().min(1, "Hospital is required"),
+  doctorId: z.string().min(1, "Doctor is required"),
+  date: z.date(),
+  timeSlot: z.string().min(1, "Time slot is required"),
+  reason: z.string().optional(),
+});

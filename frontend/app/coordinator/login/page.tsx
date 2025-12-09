@@ -206,17 +206,8 @@ export default function CoordinatorLogin() {
         </Card>
 
         <div className="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-100 dark:border-border p-4 mb-4">
-          <p className="text-xs sm:text-sm text-center text-gray-600 dark:text-gray-400 mb-3">
-            Looking for a different portal?
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs sm:text-sm">
-            <a
-              href="/login"
-              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline font-medium"
-            >
-              Doctor Login
-            </a>
-            <span className="hidden sm:inline text-gray-400 dark:text-gray-600">|</span>
+          <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+            Are you an administrator?{" "}
             <a
               href="/admin/login"
               className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline font-medium"
@@ -225,6 +216,7 @@ export default function CoordinatorLogin() {
             </a>
           </div>
         </div>
+
 
         <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
           By signing in, you agree to our{" "}

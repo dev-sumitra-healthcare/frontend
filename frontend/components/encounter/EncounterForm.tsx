@@ -38,13 +38,17 @@ const encounterFormSchema = z.object({
     heartRate: z.string().default(""),
     temperature: z.string().default(""),
     respiratoryRate: z.string().default(""),
-    oxygenSaturation: z.string().default("")
+    oxygenSaturation: z.string().default(""),
+    weight: z.string().default(""),
+    height: z.string().default("")
   }).default({
     bloodPressure: '',
     heartRate: '',
     temperature: '',
     respiratoryRate: '',
-    oxygenSaturation: ''
+    oxygenSaturation: '',
+    weight: '',
+    height: ''
   }),
   doctorRemarks: z.string().default(""),
   followUpInstructions: z.string().default(""),
@@ -87,6 +91,27 @@ export default function EncounterForm({ data = {}, encounterId, appointmentId, p
   const [doctorInfo, setDoctorInfo] = useState<{ name: string; qualification?: string; registration?: string }>();
   const [showPrescriptionPreview, setShowPrescriptionPreview] = useState(false);
   const [isPrescriptionReady, setIsPrescriptionReady] = useState(false);
+  
+  // Dynamic section ordering based on doctor preferences
+  const [sectionOrder, setSectionOrder] = useState<string[]>([
+    'vitals', 'diagnosis', 'medications', 'remarks', 'prescription'
+  ]);
+  
+  // Vitals order from doctor preferences
+  const [vitalsOrder, setVitalsOrder] = useState<string[]>([
+    'bp', 'pulse', 'temp', 'weight', 'height', 'spo2'
+  ]);
+  
+  // Vitals field configuration
+  const vitalsConfig: Record<string, { label: string; field: keyof typeof form.getValues.arguments[0]['vitalSigns']; placeholder: string }> = {
+    bp: { label: 'Blood Pressure', field: 'bloodPressure', placeholder: '120/80 mmHg' },
+    pulse: { label: 'Pulse Rate', field: 'heartRate', placeholder: '72 bpm' },
+    temp: { label: 'Temperature', field: 'temperature', placeholder: '98.6°F' },
+    weight: { label: 'Weight', field: 'weight' as any, placeholder: 'kg' },
+    height: { label: 'Height', field: 'height' as any, placeholder: 'cm' },
+    spo2: { label: 'O2 Saturation', field: 'oxygenSaturation', placeholder: '98%' },
+    respiratory: { label: 'Respiratory Rate', field: 'respiratoryRate', placeholder: '16/min' },
+  };
 
   const form = useForm<EncounterFormValues>({
     resolver: zodResolver(encounterFormSchema),
@@ -100,7 +125,9 @@ export default function EncounterForm({ data = {}, encounterId, appointmentId, p
         heartRate: '',
         temperature: '',
         respiratoryRate: '',
-        oxygenSaturation: ''
+        oxygenSaturation: '',
+        weight: '',
+        height: ''
       },
       doctorRemarks: data.doctorRemarks || '',
       followUpInstructions: data.followUpInstructions || '',
@@ -147,6 +174,16 @@ export default function EncounterForm({ data = {}, encounterId, appointmentId, p
             qualification: d.qualifications?.[0]?.degree,
             registration: d.medicalRegistrationId,
           });
+          
+          // Load section order from preferences
+          const prefs = (d as any).ui_preferences;
+          if (prefs?.encounterFormOrder?.length) {
+            setSectionOrder(prefs.encounterFormOrder);
+          }
+          // Load vitals order from preferences
+          if (prefs?.vitalsOrder?.length) {
+            setVitalsOrder(prefs.vitalsOrder);
+          }
         }
       } catch (error) {
         console.error('Error loading templates/doctor info:', error);
@@ -334,7 +371,7 @@ export default function EncounterForm({ data = {}, encounterId, appointmentId, p
       }
 
       // Success - navigate back to dashboard
-      router.push('/dashboard');
+      router.push('/doctor/dashboard');
     } catch (error) {
       console.error('Error finalizing encounter:', error);
       // Check if it's a prescription error (409 conflict)
@@ -353,6 +390,120 @@ export default function EncounterForm({ data = {}, encounterId, appointmentId, p
     console.log('Saving draft:', values);
     // In a real application, you would save this as a draft
     alert('Draft saved successfully!');
+  };
+
+  // Section definitions for dynamic rendering
+  const sectionDefinitions: Record<string, { id: string; label: string }> = {
+    vitals: { id: 'vitals', label: 'Vital Signs' },
+    diagnosis: { id: 'diagnosis', label: 'Diagnosis' },
+    medications: { id: 'medications', label: 'Medications' },
+    symptoms: { id: 'symptoms', label: 'Symptoms & History' },
+    remarks: { id: 'remarks', label: 'Doctor\'s Remarks' },
+    notes: { id: 'notes', label: 'Clinical Notes' },
+    prescription: { id: 'prescription', label: 'Prescription' },
+  };
+
+  // Helper to render sections in preference order
+  const renderSection = (sectionId: string) => {
+    switch (sectionId) {
+      case 'vitals':
+        return (
+          <div key="vitals">
+            <h3 className="text-lg font-medium mb-3">Vital Signs</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {vitalsOrder.map((vitalId) => {
+                const config = vitalsConfig[vitalId];
+                if (!config) return null;
+                // Map vital IDs to form field names
+                const fieldMap: Record<string, string> = {
+                  bp: 'vitalSigns.bloodPressure',
+                  pulse: 'vitalSigns.heartRate',
+                  temp: 'vitalSigns.temperature',
+                  weight: 'vitalSigns.weight',
+                  height: 'vitalSigns.height',
+                  spo2: 'vitalSigns.oxygenSaturation',
+                  respiratory: 'vitalSigns.respiratoryRate',
+                };
+                const fieldName = fieldMap[vitalId];
+                return (
+                  <div key={vitalId}>
+                    <label className="block text-sm font-medium text-gray-700">{config.label}</label>
+                    <Input {...form.register(fieldName as any)} placeholder={config.placeholder} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      
+      case 'diagnosis':
+        return (
+          <div key="diagnosis">
+            <h3 className="text-lg font-medium mb-3">Diagnosis</h3>
+            {diagnosisFields.map((field, index) => (
+              <div key={field.id} className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
+                <Input {...form.register(`diagnosis.${index}.code`)} placeholder="ICD Code" />
+                <Input {...form.register(`diagnosis.${index}.description`)} placeholder="Diagnosis" />
+                <div className="flex space-x-2">
+                  <select {...form.register(`diagnosis.${index}.confidence`)} className="flex-1 px-3 py-2 border border-gray-300 rounded-md">
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+                  <Button type="button" onClick={() => removeDiagnosis(index)} variant="destructive" size="sm">Remove</Button>
+                </div>
+              </div>
+            ))}
+            <Button
+              type="button"
+              onClick={() => appendDiagnosis({ code: "", description: "", confidence: "High" })}
+              variant="outline"
+              className="mt-2"
+            >
+              + Add Diagnosis
+            </Button>
+          </div>
+        );
+      
+      case 'medications':
+        return (
+          <div key="medications">
+            <h3 className="text-lg font-medium mb-3">Medications</h3>
+            {medicationFields.map((field, index) => (
+              <div key={field.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 mb-2">
+                <Input {...form.register(`medications.${index}.name`)} placeholder="Medication" />
+                <Input {...form.register(`medications.${index}.dosage`)} placeholder="Dosage" />
+                <Input {...form.register(`medications.${index}.frequency`)} placeholder="Frequency" />
+                <Input {...form.register(`medications.${index}.duration`)} placeholder="Duration" />
+                <div className="flex space-x-2">
+                  <Input {...form.register(`medications.${index}.instructions`)} placeholder="Instructions" className="flex-1" />
+                  <Button type="button" onClick={() => removeMedication(index)} variant="destructive" size="sm">Remove</Button>
+                </div>
+              </div>
+            ))}
+            <Button
+              type="button"
+              onClick={() => appendMedication({ name: "", dosage: "", frequency: "", duration: "", instructions: "" })}
+              variant="outline"
+              className="mt-2"
+            >
+              + Add Medication
+            </Button>
+          </div>
+        );
+      
+      case 'remarks':
+      case 'notes':
+        return (
+          <div key={sectionId}>
+            <label className="block text-sm font-medium text-gray-700">Doctor's Remarks & Assessment</label>
+            <Textarea {...form.register("doctorRemarks")} className="mt-1 block w-full" rows={4} />
+          </div>
+        );
+      
+      default:
+        return null;
+    }
   };
 
   return (
@@ -381,92 +532,10 @@ export default function EncounterForm({ data = {}, encounterId, appointmentId, p
             )}
           </div>
 
-          {/* Vital Signs */}
-          <div>
-            <h3 className="text-lg font-medium mb-3">Vital Signs</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Blood Pressure</label>
-                <Input {...form.register("vitalSigns.bloodPressure")} placeholder="120/80 mmHg" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Heart Rate</label>
-                <Input {...form.register("vitalSigns.heartRate")} placeholder="72 bpm" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Temperature</label>
-                <Input {...form.register("vitalSigns.temperature")} placeholder="98.6°F" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Respiratory Rate</label>
-                <Input {...form.register("vitalSigns.respiratoryRate")} placeholder="16/min" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">O2 Saturation</label>
-                <Input {...form.register("vitalSigns.oxygenSaturation")} placeholder="98%" />
-              </div>
-            </div>
-          </div>
+          {/* Dynamic Sections - rendered based on doctor preferences */}
+          {sectionOrder.map((sectionId) => renderSection(sectionId))}
 
-          {/* Diagnosis */}
-          <div>
-            <h3 className="text-lg font-medium mb-3">Diagnosis</h3>
-            {diagnosisFields.map((field, index) => (
-              <div key={field.id} className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
-                <Input {...form.register(`diagnosis.${index}.code`)} placeholder="ICD Code" />
-                <Input {...form.register(`diagnosis.${index}.description`)} placeholder="Diagnosis" />
-                <div className="flex space-x-2">
-                  <select {...form.register(`diagnosis.${index}.confidence`)} className="flex-1 px-3 py-2 border border-gray-300 rounded-md">
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                  </select>
-                  <Button type="button" onClick={() => removeDiagnosis(index)} variant="destructive" size="sm">Remove</Button>
-                </div>
-              </div>
-            ))}
-            <Button
-              type="button"
-              onClick={() => appendDiagnosis({ code: "", description: "", confidence: "High" })}
-              variant="outline"
-              className="mt-2"
-            >
-              + Add Diagnosis
-            </Button>
-          </div>
-
-          {/* Medications */}
-          <div>
-            <h3 className="text-lg font-medium mb-3">Medications</h3>
-            {medicationFields.map((field, index) => (
-              <div key={field.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 mb-2">
-                <Input {...form.register(`medications.${index}.name`)} placeholder="Medication" />
-                <Input {...form.register(`medications.${index}.dosage`)} placeholder="Dosage" />
-                <Input {...form.register(`medications.${index}.frequency`)} placeholder="Frequency" />
-                <Input {...form.register(`medications.${index}.duration`)} placeholder="Duration" />
-                <div className="flex space-x-2">
-                  <Input {...form.register(`medications.${index}.instructions`)} placeholder="Instructions" className="flex-1" />
-                  <Button type="button" onClick={() => removeMedication(index)} variant="destructive" size="sm">Remove</Button>
-                </div>
-              </div>
-            ))}
-            <Button
-              type="button"
-              onClick={() => appendMedication({ name: "", dosage: "", frequency: "", duration: "", instructions: "" })}
-              variant="outline"
-              className="mt-2"
-            >
-              + Add Medication
-            </Button>
-          </div>
-
-          {/* Doctor's Remarks */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Doctor's Remarks & Assessment</label>
-            <Textarea {...form.register("doctorRemarks")} className="mt-1 block w-full" rows={4} />
-          </div>
-
-          {/* Follow-up Instructions */}
+          {/* Follow-up Instructions (always shown) */}
           <div>
             <label className="block text-sm font-medium text-gray-700">Follow-up Instructions</label>
             <Textarea {...form.register("followUpInstructions")} className="mt-1 block w-full" rows={3} />

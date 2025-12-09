@@ -87,26 +87,27 @@ export default function AdminDashboardPage() {
       setLoading(true);
       
       // Only fetch stats if admin has permission
-      let statsPromise = null;
+      const promises = [];
       if (admin?.permissions.canViewAnalytics) {
-        statsPromise = getAdminDashboardStats();
+        promises.push(getAdminDashboardStats());
       }
-      
-      // Only fetch doctors if admin has permission
-      let doctorsPromise = null;
       if (admin?.permissions.canManageDoctors) {
-        doctorsPromise = getDoctors({ page: 1, limit: 50 });
+        promises.push(getDoctors({ page: 1, limit: 50 }));
       }
       
-      const promises = [statsPromise, doctorsPromise].filter(Boolean);
       const results = await Promise.all(promises);
       
-      if (statsPromise && results[0]) {
-        setStats(results[0].data.data);
+      let resultIndex = 0;
+      if (admin?.permissions.canViewAnalytics) {
+        const statsRes = results[resultIndex++];
+        // @ts-ignore - we know this is the stats response
+        setStats(statsRes.data.data);
       }
       
-      if (doctorsPromise && results[results.length - 1]) {
-        setDoctors(results[results.length - 1].data.data.doctors);
+      if (admin?.permissions.canManageDoctors) {
+        const doctorsRes = results[resultIndex++];
+        // @ts-ignore - we know this is the doctors response
+        setDoctors(doctorsRes.data.data.doctors);
       }
     } catch (error) {
       toast.error("Failed to load dashboard data");

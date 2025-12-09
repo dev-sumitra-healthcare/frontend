@@ -89,6 +89,20 @@ export default function PatientProfileWidget() {
               <span className="font-medium">{profile.fullName}</span>
             </div>
           </div>
+          
+          {/* MedMitra ID - Prominent Display */}
+          {profile.mid && (
+            <div className="space-y-1">
+              <div className="text-sm font-medium text-muted-foreground">MedMitra ID</div>
+              <Badge variant="default" className="font-mono bg-purple-600 hover:bg-purple-700 text-white">
+                {profile.mid}
+              </Badge>
+              <p className="text-xs text-muted-foreground mt-1">
+                Your universal health ID across all hospitals
+              </p>
+            </div>
+          )}
+          
           <div className="space-y-1">
             <div className="text-sm font-medium text-muted-foreground">UHID</div>
             <Badge variant="outline" className="font-mono">{profile.uhid}</Badge>
@@ -217,4 +231,3 @@ export default function PatientProfileWidget() {
     </Card>
   );
 }
-

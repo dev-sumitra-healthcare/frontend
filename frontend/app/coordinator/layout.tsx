@@ -13,8 +13,10 @@ export default function CoordinatorLayout({ children }: { children: React.ReactN
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [coordinatorData, setCoordinatorData] = useState<any>(null);
 
-  // Don't show layout on login page
-  const isLoginPage = pathname === '/coordinator/login' || pathname === '/coordinator/register';
+  // Don't show layout on public pages (login, register, landing page)
+  const isPublicPage = pathname === '/coordinator/login' || 
+    pathname === '/coordinator/register' || 
+    pathname === '/coordinator';
 
   useEffect(() => {
     // Load coordinator data from localStorage
@@ -23,14 +25,14 @@ export default function CoordinatorLayout({ children }: { children: React.ReactN
       setCoordinatorData(JSON.parse(storedData));
     }
 
-    // Check if user is authenticated (not on login page)
-    if (!isLoginPage) {
+    // Check if user is authenticated (not on public page)
+    if (!isPublicPage) {
       const token = localStorage.getItem('coordinatorAccessToken');
       if (!token) {
         router.push('/coordinator/login');
       }
     }
-  }, [isLoginPage, router]);
+  }, [isPublicPage, router]);
 
   const handleLogout = async () => {
     try {
@@ -42,8 +44,8 @@ export default function CoordinatorLayout({ children }: { children: React.ReactN
     }
   };
 
-  // If it's a login page, render children without layout
-  if (isLoginPage) {
+  // If it's a public page, render children without layout
+  if (isPublicPage) {
     return <>{children}</>;
   }
 

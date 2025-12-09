@@ -15,7 +15,7 @@ import Header from "@/components/dashboard/Header";
 
 const schema = z.object({
   fullName: z.string().min(2, "Full name is required"),
-  email: z.string().email().optional().or(z.literal("")).transform(v => v || undefined),
+  email: z.string().email().optional().or(z.literal("")),
   phone: z.string().optional(),
   dateOfBirth: z.string().optional(),
   gender: z.enum(["Male","Female","Other","Prefer not to say"]).optional(),
@@ -94,7 +94,7 @@ export default function PatientDetailPage() {
       setMessage(null);
       const payload = {
         fullName: values.fullName,
-        email: values.email,
+        email: values.email || undefined,
         phone: values.phone,
         dateOfBirth: values.dateOfBirth,
         gender: values.gender,

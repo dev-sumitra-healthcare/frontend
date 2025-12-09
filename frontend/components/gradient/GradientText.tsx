@@ -48,8 +48,8 @@ export const GradientText = React.forwardRef<
       `text-gradient-${gradient}`,
       // Animated gradient
       animated && 'animate-gradient-rotate',
-      // Base styles
-      'inline-block',
+      // Use block for headings to prevent word-breaking, inline-block for spans
+      as === 'span' || as === 'p' ? 'inline' : 'block',
       className
     );
 

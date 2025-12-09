@@ -61,6 +61,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { TriageModal } from "@/components/coordinator/TriageModal";
+import { toast } from "sonner";
 
 export default function CoordinatorAppointments() {
   const searchParams = useSearchParams();
@@ -75,6 +77,10 @@ export default function CoordinatorAppointments() {
   // View dialog state
   const [viewOpen, setViewOpen] = useState(false);
   const [viewAppt, setViewAppt] = useState<CoordinatorAppointment | null>(null);
+
+  // Triage dialog state
+  const [triageOpen, setTriageOpen] = useState(false);
+  const [triageAppt, setTriageAppt] = useState<CoordinatorAppointment | null>(null);
 
   // Create appointment dialog
   const [createOpen, setCreateOpen] = useState(false);
@@ -121,7 +127,12 @@ export default function CoordinatorAppointments() {
   }, [action]);
 
   function getTodayDate() {
-    return new Date().toISOString().split("T")[0];
+    // Use local date components to avoid UTC timezone shift
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   const loadAppointments = async () => {
@@ -519,6 +530,20 @@ export default function CoordinatorAppointments() {
                             >
                               View
                             </Button>
+                            {appointment.status === "Waiting" && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                onClick={() => {
+                                  setTriageAppt(appointment);
+                                  setTriageOpen(true);
+                                }}
+                              >
+                                <Activity className="h-4 w-4 mr-1" />
+                                Triage
+                              </Button>
+                            )}
                             {appointment.status === "Waiting" && (
                               <Button
                                 variant="ghost"
@@ -945,6 +970,25 @@ export default function CoordinatorAppointments() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Triage Modal */}
+      {triageAppt && (
+        <TriageModal
+          open={triageOpen}
+          onOpenChange={setTriageOpen}
+          appointmentId={triageAppt.appointmentId}
+          patient={{
+            id: triageAppt.patient.id,
+            name: triageAppt.patient.fullName || "Unknown",
+            uhid: triageAppt.patient.uhid || "N/A",
+            phone: triageAppt.patient.phoneNumber,
+          }}
+          onSuccess={() => {
+            loadAppointments();
+            toast.success("Triage completed successfully!");
+          }}
+        />
+      )}
     </div>
   );
 }

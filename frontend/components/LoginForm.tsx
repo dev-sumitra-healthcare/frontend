@@ -32,7 +32,7 @@ export function LoginForm() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace('/dashboard');
+      router.replace('/doctor/dashboard');
     }
   }, [isAuthenticated, router]);
 

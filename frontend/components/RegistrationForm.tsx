@@ -87,7 +87,7 @@ export function RegistrationForm() {
         });
         
         // Redirect to login
-        router.push('/login');
+        router.push('/doctor/login');
       }
     } catch (error: unknown) {
       let errorMessage = "An unexpected error occurred.";
@@ -276,7 +276,7 @@ export function RegistrationForm() {
                 variant="link" 
                 className="px-0 font-medium" 
                 type="button"
-                onClick={() => router.push('/login')}
+                onClick={() => router.push('/doctor/login')}
               >
                 Login here
               </Button>

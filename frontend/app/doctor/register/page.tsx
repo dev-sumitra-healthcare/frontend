@@ -15,7 +15,7 @@ export default function DoctorRegisterPage() {
     
       <div className="relative min-h-screen flex items-center justify-center py-20 px-4 overflow-hidden">
         {/* Background Effects */}
-        <GradientMesh variant="primary" />
+        <GradientMesh variant="hero" />
 
         {/* Fixed GradientOrb usage */}
         <GradientOrb
@@ -45,7 +45,7 @@ export default function DoctorRegisterPage() {
                   transition={{ duration: 0.6 }}
                 >
                   <GradientText
-                    variant="primary"
+                    gradient="primary"
                     className="text-4xl md:text-5xl font-bold mb-4"
                   >
                     Doctor Registration

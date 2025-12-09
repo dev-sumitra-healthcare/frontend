@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { PatientAuthProvider } from "@/contexts/PatientAuthContext";
+import ReactQueryProvider from "@/lib/react-query";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,8 +40,10 @@ export default function RootLayout({
         >
           <AuthProvider>
             <PatientAuthProvider>
-              {children}
-              <Toaster />
+              <ReactQueryProvider>
+                {children}
+                <Toaster />
+              </ReactQueryProvider>
             </PatientAuthProvider>
           </AuthProvider>
         </ThemeProvider>
