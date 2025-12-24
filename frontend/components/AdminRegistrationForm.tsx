@@ -46,7 +46,7 @@ export function AdminRegistrationForm() {
     setIsLoading(true);
     try {
       const response = await registerAdmin(values);
-      localStorage.setItem("adminAccessToken", response.data.data.admin.accessToken);
+      localStorage.setItem("adminAccessToken", response.data.data.accessToken);
       localStorage.setItem("admin", JSON.stringify(response.data.data.admin));
       toast.success("Admin Registration Successful", {
         description: "First admin account created. Redirecting to admin dashboard.",

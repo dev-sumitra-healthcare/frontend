@@ -338,115 +338,101 @@ export default function CoordinatorAppointments() {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Appointments</h1>
-          <p className="text-gray-600 mt-2">
+          <h2 className="text-[24px] font-semibold text-[#101828] tracking-[-0.3125px]" style={{ fontFamily: 'Inter, sans-serif' }}>Appointments</h2>
+          <p className="text-[16px] text-[#475467] tracking-[-0.3125px] mt-1" style={{ fontFamily: 'Inter, sans-serif' }}>
             Hospital-wide appointment calendar
           </p>
         </div>
-        <Button className="mt-4 md:mt-0" onClick={openCreateDialog}>
-          <CalendarPlus className="h-4 w-4 mr-2" />
+        <button 
+          className="mt-4 md:mt-0 flex items-center gap-2 px-4 py-2 bg-[#10B981] text-white rounded-lg hover:bg-[#059669] transition-colors text-[15px] font-medium"
+          onClick={openCreateDialog}
+        >
+          <CalendarPlus className="h-4 w-4" />
           Schedule New Appointment
-        </Button>
+        </button>
       </div>
 
       {/* Date Selector & Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Date Selector */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Select Date</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2">
-              <Input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="flex-1"
-              />
-              <Button
-                variant="outline"
-                onClick={() => setSelectedDate(getTodayDate())}
-                disabled={selectedDate === getTodayDate()}
-              >
-                Today
-              </Button>
-            </div>
-            <div className="mt-2 text-sm text-gray-600">
-              {new Date(selectedDate).toLocaleDateString("en-US", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="bg-white rounded-[16px] border border-[#d1fae5] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] p-6">
+          <p className="text-[14px] font-medium text-[#475467] mb-4" style={{ fontFamily: 'Inter, sans-serif' }}>Select Date</p>
+          <div className="flex gap-2">
+            <Input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="flex-1"
+            />
+            <button
+              onClick={() => setSelectedDate(getTodayDate())}
+              disabled={selectedDate === getTodayDate()}
+              className="px-3 py-2 border border-[#d1fae5] rounded-lg text-[14px] text-[#475467] hover:bg-[#ecfdf5] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Today
+            </button>
+          </div>
+          <div className="mt-3 text-[14px] text-[#475467]">
+            {new Date(selectedDate).toLocaleDateString("en-US", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </div>
+        </div>
 
         {/* Stats Cards */}
         {stats && (
           <>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm text-gray-600">
-                  Total Appointments
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-3xl font-bold">{stats.total}</div>
-                  <CalendarIcon className="h-8 w-8 text-blue-500" />
+            <div className="bg-white rounded-[16px] border border-[#d1fae5] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] p-6">
+              <p className="text-[14px] font-medium text-[#475467] mb-4" style={{ fontFamily: 'Inter, sans-serif' }}>Total Appointments</p>
+              <div className="flex items-center justify-between">
+                <div className="text-[32px] font-bold text-[#101828]" style={{ fontFamily: 'Inter, sans-serif' }}>{stats.total}</div>
+                <div className="p-2 bg-[#d1fae5] rounded-lg">
+                  <CalendarIcon className="h-6 w-6 text-[#10B981]" />
                 </div>
-                <div className="mt-2 text-sm text-gray-600">
-                  {stats.byStatus?.Completed || 0} completed •{" "}
-                  {stats.byStatus?.Waiting || 0} waiting
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+              <div className="mt-3 text-[13px] text-[#475467]">
+                {stats.byStatus?.Completed || 0} completed • {stats.byStatus?.Waiting || 0} waiting
+              </div>
+            </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm text-gray-600">
-                  Completion Rate
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-3xl font-bold">
-                    {stats.total > 0
-                      ? Math.round(
-                          ((stats.byStatus?.Completed || 0) / stats.total) * 100
-                        )
-                      : 0}
-                    %
-                  </div>
-                  <CheckCircle className="h-8 w-8 text-green-500" />
+            <div className="bg-white rounded-[16px] border border-[#d1fae5] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] p-6">
+              <p className="text-[14px] font-medium text-[#475467] mb-4" style={{ fontFamily: 'Inter, sans-serif' }}>Completion Rate</p>
+              <div className="flex items-center justify-between">
+                <div className="text-[32px] font-bold text-[#101828]" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  {stats.total > 0 ? Math.round(((stats.byStatus?.Completed || 0) / stats.total) * 100) : 0}%
                 </div>
-                <div className="mt-2 text-sm text-gray-600">
-                  {stats.byStatus?.Cancelled || 0} cancelled •{" "}
-                  {stats.byStatus?.["No-Show"] || 0} no-shows
+                <div className="p-2 bg-[#d1fae5] rounded-lg">
+                  <CheckCircle className="h-6 w-6 text-[#10B981]" />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              <div className="mt-3 text-[13px] text-[#475467]">
+                {stats.byStatus?.Cancelled || 0} cancelled • {stats.byStatus?.["No-Show"] || 0} no-shows
+              </div>
+            </div>
           </>
         )}
       </div>
 
       {/* Appointments Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Appointments for {new Date(selectedDate).toLocaleDateString()}
-            <Badge variant="secondary" className="ml-2">
+      <div className="bg-white rounded-[16px] border border-[#d1fae5] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)]">
+        <div className="p-6 border-b border-[#d1fae5]">
+          <div className="flex items-center gap-3">
+            <h3 className="text-[18px] font-semibold text-[#101828] tracking-[-0.3125px]" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Appointments for {new Date(selectedDate).toLocaleDateString()}
+            </h3>
+            <span className="px-3 py-1 bg-[#d1fae5] text-[#10B981] text-[14px] font-medium rounded-full">
               {appointments.length} appointments
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+            </span>
+          </div>
+        </div>
+        <div className="p-6">
           {loading ? (
             <div className="space-y-3">
               {[...Array(8)].map((_, i) => (
@@ -565,8 +551,8 @@ export default function CoordinatorAppointments() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Create Appointment Dialog - Improved UI */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

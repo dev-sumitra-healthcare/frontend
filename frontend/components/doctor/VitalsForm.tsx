@@ -24,10 +24,10 @@ interface VitalsFormProps {
 
 const vitalsSchema = z.object({
   bp: z.string().optional(),
-  heartRate: z.coerce.number().optional(),
-  temperature: z.coerce.number().optional(),
-  weight: z.coerce.number().optional(),
-  height: z.coerce.number().optional(),
+  heartRate: z.preprocess((val) => val ? Number(val) : undefined, z.number().optional()),
+  temperature: z.preprocess((val) => val ? Number(val) : undefined, z.number().optional()),
+  weight: z.preprocess((val) => val ? Number(val) : undefined, z.number().optional()),
+  height: z.preprocess((val) => val ? Number(val) : undefined, z.number().optional()),
 });
 
 export default function VitalsForm({
@@ -41,7 +41,7 @@ export default function VitalsForm({
     handleSubmit,
     formState: { errors },
   } = useForm<VitalsData>({
-    resolver: zodResolver(vitalsSchema),
+    resolver: zodResolver(vitalsSchema) as any, // Type assertion due to zod coerce inference
     defaultValues: initialValues || {},
   });
 

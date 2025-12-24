@@ -42,13 +42,22 @@ const MOCK_PATIENT = {
   allergies: ["Penicillin", "Peanuts"],
 };
 
+// Create a local schema that matches what the form actually uses
+const LocalEncounterFormSchema = z.object({
+  chiefComplaint: z.string().min(1, "Chief complaint is required"),
+  historyOfPresentIllness: z.string().optional(),
+  diagnosis: z.string().optional(),
+  treatmentPlan: z.string().optional(),
+  prescription: z.string().optional(),
+});
+
 export default function EncounterWorkspace({ params }: { params: { id: string } }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [diagnosisSuggestions, setDiagnosisSuggestions] = useState<DiagnosisSuggestion[]>([]);
   const [clinicalSummary, setClinicalSummary] = useState<ClinicalSummary | null>(null);
 
-  const form = useForm<z.infer<typeof EncounterFormSchema>>({
-    resolver: zodResolver(EncounterFormSchema),
+  const form = useForm<z.infer<typeof LocalEncounterFormSchema>>({
+    resolver: zodResolver(LocalEncounterFormSchema),
     defaultValues: {
       chiefComplaint: "",
       historyOfPresentIllness: "",
@@ -86,7 +95,7 @@ export default function EncounterWorkspace({ params }: { params: { id: string } 
     loadSummary();
   }, []);
 
-  const onSubmit = async (data: z.infer<typeof EncounterFormSchema>) => {
+  const onSubmit = async (data: z.infer<typeof LocalEncounterFormSchema>) => {
     toast.success("Encounter saved successfully!");
     console.log("Encounter Data:", data);
     // In real app: await saveEncounter(data);

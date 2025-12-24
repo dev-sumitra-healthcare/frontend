@@ -14,6 +14,7 @@ import {
   getUnifiedPatientHistory,
   type CoordinatorPatientsResponse,
   type GlobalPatient,
+  type GlobalPatientResult,
 } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -162,7 +163,7 @@ export default function CoordinatorPatients() {
   // Universal Search State
   const [universalSearchOpen, setUniversalSearchOpen] = useState(false);
   const [universalSearchQuery, setUniversalSearchQuery] = useState("");
-  const [universalSearchResults, setUniversalSearchResults] = useState<GlobalPatient[]>([]);
+  const [universalSearchResults, setUniversalSearchResults] = useState<GlobalPatientResult[]>([]);
   const [universalSearchLoading, setUniversalSearchLoading] = useState(false);
   const [enrollLoading, setEnrollLoading] = useState(false);
 
@@ -183,7 +184,7 @@ export default function CoordinatorPatients() {
     }
   };
 
-  const handleEnroll = async (patient: GlobalPatient) => {
+  const handleEnroll = async (patient: GlobalPatientResult) => {
     try {
       setEnrollLoading(true);
       // Get hospital ID from coordinator data in localStorage
@@ -192,14 +193,14 @@ export default function CoordinatorPatients() {
       
       const { hospitalId } = JSON.parse(coordinatorData);
       
-      await enrollGlobalPatient(patient.mid, { hospitalId });
+      await enrollGlobalPatient(patient.mid);
       
       setUniversalSearchOpen(false);
       setUniversalSearchResults([]);
       setUniversalSearchQuery("");
       // Refresh patient list
       loadPatients();
-      alert(`Patient ${patient.fullName} enrolled successfully!`);
+      alert(`Patient ${patient.full_name} enrolled successfully!`);
     } catch (err: any) {
       alert(err.response?.data?.message || "Failed to enroll patient");
     } finally {
@@ -436,11 +437,11 @@ export default function CoordinatorPatients() {
   }
 
   return (
-    <div>
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">All Patients</h1>
-          <p className="text-gray-600 mt-2">
+          <h2 className="text-[24px] font-semibold text-[#101828] tracking-[-0.3125px]" style={{ fontFamily: 'Inter, sans-serif' }}>All Patients</h2>
+          <p className="text-[16px] text-[#475467] tracking-[-0.3125px] mt-1" style={{ fontFamily: 'Inter, sans-serif' }}>
             Hospital-wide patient roster • {total} total patients
           </p>
         </div>
@@ -450,8 +451,8 @@ export default function CoordinatorPatients() {
       </div>
 
       {/* Search Bar */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
+      <div className="bg-white rounded-[16px] border border-[#d1fae5] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] p-6">
+        <div>
           <form onSubmit={handleSearch} className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -476,20 +477,22 @@ export default function CoordinatorPatients() {
               </Button>
             )}
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Patients Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Patient List
-            <Badge variant="secondary" className="ml-2">
+      <div className="bg-white rounded-[16px] border border-[#d1fae5] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)]">
+        <div className="p-6 border-b border-[#d1fae5]">
+          <div className="flex items-center gap-3">
+            <h3 className="text-[18px] font-semibold text-[#101828] tracking-[-0.3125px]" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Patient List
+            </h3>
+            <span className="px-3 py-1 bg-[#d1fae5] text-[#10B981] text-[14px] font-medium rounded-full">
               {total} patients
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+            </span>
+          </div>
+        </div>
+        <div className="p-6">
           {loading ? (
             <div className="space-y-3">
               {[...Array(10)].map((_, i) => (
@@ -663,8 +666,8 @@ export default function CoordinatorPatients() {
               )}
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Universal Search Dialog */}
       <Dialog open={universalSearchOpen} onOpenChange={setUniversalSearchOpen}>
@@ -697,11 +700,11 @@ export default function CoordinatorPatients() {
                 {universalSearchResults.map((patient) => (
                   <div key={patient.id} className="flex items-center justify-between p-4 border rounded-lg bg-gray-50 dark:bg-gray-900/50">
                     <div>
-                      <p className="font-medium text-lg">{patient.fullName}</p>
+                      <p className="font-medium text-lg">{patient.full_name}</p>
                       <div className="text-sm text-gray-500 space-y-1">
                         <p>MID: {patient.mid}</p>
                         <p>Phone: {patient.phone}</p>
-                        <p>DOB: {patient.dateOfBirth ? new Date(patient.dateOfBirth).toLocaleDateString() : 'N/A'}</p>
+                        <p>DOB: {patient.date_of_birth ? new Date(patient.date_of_birth).toLocaleDateString() : 'N/A'}</p>
                       </div>
                     </div>
                     <Button 

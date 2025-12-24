@@ -1,17 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { LayoutDashboard, Users, Calendar, LogOut, Menu, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useRouter, usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { 
+  Stethoscope, 
+  FileText, 
+  Calendar,
+  Search,
+  User, 
+  LogOut
+} from 'lucide-react';
 import { logoutCoordinator } from '@/lib/api';
 
+type TabType = 'opd' | 'past-cases' | 'appointments' | 'patient-search' | 'profile';
+
 export default function CoordinatorLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
+  const [isLoading, setIsLoading] = useState(true);
   const [coordinatorData, setCoordinatorData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('opd');
 
   // Don't show layout on public pages (login, register, landing page)
   const isPublicPage = pathname === '/coordinator/login' || 
@@ -30,9 +38,26 @@ export default function CoordinatorLayout({ children }: { children: React.ReactN
       const token = localStorage.getItem('coordinatorAccessToken');
       if (!token) {
         router.push('/coordinator/login');
+        return;
       }
     }
+    setIsLoading(false);
   }, [isPublicPage, router]);
+
+  // Set active tab based on pathname
+  useEffect(() => {
+    if (pathname.includes('/coordinator/dashboard') || pathname.includes('/coordinator/opd')) {
+      setActiveTab('opd');
+    } else if (pathname.includes('/coordinator/past-cases')) {
+      setActiveTab('past-cases');
+    } else if (pathname.includes('/coordinator/appointments')) {
+      setActiveTab('appointments');
+    } else if (pathname.includes('/coordinator/patient-search') || pathname.includes('/coordinator/patients')) {
+      setActiveTab('patient-search');
+    } else if (pathname.includes('/coordinator/profile')) {
+      setActiveTab('profile');
+    }
+  }, [pathname]);
 
   const handleLogout = async () => {
     try {
@@ -40,7 +65,31 @@ export default function CoordinatorLayout({ children }: { children: React.ReactN
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      localStorage.removeItem('coordinatorAccessToken');
+      localStorage.removeItem('coordinatorRefreshToken');
+      localStorage.removeItem('coordinatorData');
       router.push('/coordinator/login');
+    }
+  };
+
+  const handleTabClick = (tabId: TabType) => {
+    setActiveTab(tabId);
+    switch (tabId) {
+      case 'opd':
+        router.push('/coordinator/dashboard');
+        break;
+      case 'past-cases':
+        router.push('/coordinator/past-cases');
+        break;
+      case 'appointments':
+        router.push('/coordinator/appointments');
+        break;
+      case 'patient-search':
+        router.push('/coordinator/patients');
+        break;
+      case 'profile':
+        router.push('/coordinator/profile');
+        break;
     }
   };
 
@@ -49,110 +98,85 @@ export default function CoordinatorLayout({ children }: { children: React.ReactN
     return <>{children}</>;
   }
 
-  const navItems = [
-    {
-      name: 'Dashboard',
-      href: '/coordinator/dashboard',
-      icon: LayoutDashboard,
-    },
-    {
-      name: 'All Patients',
-      href: '/coordinator/patients',
-      icon: Users,
-    },
-    {
-      name: 'Appointments',
-      href: '/coordinator/appointments',
-      icon: Calendar,
-    },
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%)' }}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#10B981] mx-auto mb-4"></div>
+          <p className="text-[#475467]">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const coordinatorName = coordinatorData?.fullName || coordinatorData?.username || 'Coordinator';
+
+  const tabs = [
+    { id: 'opd' as TabType, label: 'OPD', icon: Stethoscope },
+    { id: 'past-cases' as TabType, label: 'Past Cases', icon: FileText },
+    { id: 'appointments' as TabType, label: 'Appointment', icon: Calendar },
+    { id: 'patient-search' as TabType, label: 'Patient Search', icon: Search },
+    { id: 'profile' as TabType, label: 'Profile', icon: User },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Coordinator Portal</h1>
-        <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(!sidebarOpen)}>
-          {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
-      </div>
-
-      {/* Sidebar */}
-      <aside
-        className={`
-          fixed top-0 left-0 z-40 h-screen w-64 bg-white border-r border-gray-200
-          transform transition-transform duration-300 ease-in-out
-          lg:translate-x-0
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        `}
-      >
-        <div className="flex flex-col h-full">
-          {/* Logo/Header */}
-          <div className="p-6 border-b border-gray-200">
-            <h1 className="text-xl font-bold text-gray-900">MedMitra</h1>
-            <p className="text-sm text-gray-600 mt-1">Coordinator Portal</p>
+    <div className="min-h-screen" style={{ background: 'linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%)' }}>
+      {/* Header */}
+      <header className="px-8 py-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {/* Green User Icon */}
+          <div className="w-[48px] h-[48px] rounded-full bg-[#d1fae5] border-2 border-[#10B981] flex items-center justify-center">
+            <User className="w-6 h-6 text-[#10B981]" />
           </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-2">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
-              const Icon = item.icon;
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={`
-                    flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors
-                    ${
-                      isActive
-                        ? 'bg-blue-50 text-blue-600'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }
-                  `}
-                >
-                  <Icon className="h-5 w-5 mr-3" />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* User info & Logout */}
-          <div className="p-4 border-t border-gray-200">
-            {coordinatorData && (
-              <div className="mb-3 px-2">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {coordinatorData.fullName}
-                </p>
-                <p className="text-xs text-gray-600 truncate">{coordinatorData.email}</p>
-              </div>
-            )}
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-              onClick={handleLogout}
-            >
-              <LogOut className="h-5 w-5 mr-3" />
-              Logout
-            </Button>
+          <div>
+            <h1 className="text-[24px] font-semibold text-[#101828] tracking-[-0.3px]" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Coordinator Portal
+            </h1>
+            <p className="text-[16px] text-[#10B981] font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {coordinatorName}
+            </p>
           </div>
         </div>
-      </aside>
+        
+        <button 
+          onClick={handleLogout}
+          className="flex items-center gap-2 text-[#475467] hover:text-[#101828] transition-colors"
+        >
+          <LogOut className="w-5 h-5" />
+          <span className="text-[16px] font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>Logout</span>
+        </button>
+      </header>
 
-      {/* Overlay for mobile */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <main className="px-8 pb-8">
+        {/* Navigation Tabs Card */}
+        <div className="bg-white rounded-[16px] shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.1),0px_2px_4px_-2px_rgba(0,0,0,0.1)] mb-6 overflow-hidden">
+          <div className="flex">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabClick(tab.id)}
+                  className={`flex items-center gap-2 px-6 py-4 text-[16px] transition-all relative border-b-2 ${
+                    isActive 
+                      ? 'text-[#10B981] font-medium border-[#10B981]' 
+                      : 'text-[#475467] border-transparent hover:text-[#101828]'
+                  }`}
+                  style={{ fontFamily: 'Inter, sans-serif' }}
+                >
+                  <Icon className="w-5 h-5" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-      {/* Main content */}
-      <main className="lg:ml-64 pt-16 lg:pt-0">
-        <div className="p-6">{children}</div>
+        {/* Tab Content */}
+        <div className="animate-fade-in">
+          {children}
+        </div>
       </main>
     </div>
   );

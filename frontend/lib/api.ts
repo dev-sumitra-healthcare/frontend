@@ -156,6 +156,7 @@ export interface AdminRegistrationResponse {
   message: string;
   data: {
     admin: AdminLoginResponse["data"]["admin"];
+    accessToken: string;
   };
 }
 

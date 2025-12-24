@@ -114,7 +114,7 @@ export default function EncounterForm({ data = {}, encounterId, appointmentId, p
   };
 
   const form = useForm<EncounterFormValues>({
-    resolver: zodResolver(encounterFormSchema),
+    resolver: zodResolver(encounterFormSchema) as any, // Type assertion due to zod inference
     defaultValues: {
       chiefComplaint: data.chiefComplaint || '',
       presentingSymptoms: data.presentingSymptoms || [],

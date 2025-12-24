@@ -1,67 +1,217 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
-  getCoordinatorTopStats,
-  getCoordinatorAppointmentTrends,
-  type CoordinatorDashboardStats,
-  type CoordinatorAppointmentTrend
+  getCoordinatorAppointmentsByDate,
+  type CoordinatorAppointment
 } from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Users, Calendar, CheckCircle, Clock, TrendingUp, UserPlus } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { User, Clock, ArrowRight } from 'lucide-react';
+
+// Status types for independent tracking
+type StatusLevel = 'not-started' | 'under-process' | 'done';
+type PatientStatus = 'waiting' | 'in-progress' | 'completed';
+
+interface QueuePatient {
+  appointmentId: string;
+  patientId: string;
+  patientName: string;
+  uhid: string;
+  age: number;
+  gender: string;
+  appointmentTime: string;
+  // Independent status tracking
+  paymentStatus: StatusLevel;
+  vitalsStatus: StatusLevel;
+  status: PatientStatus;
+}
+
+// Status colors: White (not started), Orange (under process), Green (done)
+const getStatusColor = (status: StatusLevel): string => {
+  switch (status) {
+    case 'not-started':
+      return 'bg-white border-2 border-gray-300'; // White with border
+    case 'under-process':
+      return 'bg-orange-400'; // Orange
+    case 'done':
+      return 'bg-green-500'; // Green
+    default:
+      return 'bg-white border-2 border-gray-300';
+  }
+};
+
+const getStatusLabel = (status: StatusLevel): string => {
+  switch (status) {
+    case 'not-started':
+      return 'Not Started';
+    case 'under-process':
+      return 'Under Process';
+    case 'done':
+      return 'Done';
+    default:
+      return 'Unknown';
+  }
+};
+
+// Status indicator component
+const StatusIndicator = ({ label, status }: { label: string; status: StatusLevel }) => (
+  <div className="flex items-center gap-2">
+    <div className={`w-4 h-4 rounded-full ${getStatusColor(status)}`} title={getStatusLabel(status)} />
+    <span className="text-[13px] text-[#475467]">{label}</span>
+  </div>
+);
 
 export default function CoordinatorDashboard() {
-  const [stats, setStats] = useState<CoordinatorDashboardStats | null>(null);
-  const [trends, setTrends] = useState<CoordinatorAppointmentTrend[]>([]);
+  const router = useRouter();
+  const [patients, setPatients] = useState<QueuePatient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const today = new Date();
 
   useEffect(() => {
-    loadDashboardData();
+    loadTodayAppointments();
   }, []);
 
-  const loadDashboardData = async () => {
+  const loadTodayAppointments = async () => {
     try {
       setLoading(true);
       setError('');
 
-      // Load stats and trends in parallel
-      const [statsResponse, trendsResponse] = await Promise.all([
-        getCoordinatorTopStats(),
-        getCoordinatorAppointmentTrends(),
-      ]);
+      // Format today's date
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
 
-      if (statsResponse.data.success) {
-        setStats(statsResponse.data.data);
-      }
+      const response = await getCoordinatorAppointmentsByDate(dateStr);
 
-      if (trendsResponse.data.success) {
-        setTrends(trendsResponse.data.data.trends);
+      if (response.data.success) {
+        const appointments = response.data.data.appointments || [];
+        
+        // Transform appointments to queue patients
+        const queuePatients: QueuePatient[] = appointments.map((apt: CoordinatorAppointment) => {
+          // Determine overall status based on appointment status
+          let status: PatientStatus = 'waiting';
+          if (apt.status === 'In-Consultation' || apt.status === 'Documentation-Pending') {
+            status = 'in-progress';
+          } else if (apt.status === 'Completed') {
+            status = 'completed';
+          }
+
+          // Determine Payment and Vitals status independently
+          // For now, derive from appointment status (can be enhanced with actual API data)
+          let paymentStatus: StatusLevel = 'not-started';
+          let vitalsStatus: StatusLevel = 'not-started';
+
+          if (apt.status === 'In-Consultation') {
+            // Both should be at least under process
+            paymentStatus = 'under-process';
+            vitalsStatus = 'under-process';
+          } else if (apt.status === 'Documentation-Pending' || apt.status === 'Completed') {
+            // Both done
+            paymentStatus = 'done';
+            vitalsStatus = 'done';
+          }
+
+          return {
+            appointmentId: apt.appointmentId,
+            patientId: apt.patient.id,
+            patientName: apt.patient.fullName,
+            uhid: apt.patient.uhid,
+            age: 0,
+            gender: 'Unknown',
+            appointmentTime: new Date(apt.scheduledTime).toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true
+            }),
+            paymentStatus,
+            vitalsStatus,
+            status
+          };
+        });
+
+        setPatients(queuePatients);
       }
     } catch (err: any) {
-      console.error('Failed to load dashboard data:', err);
-      setError(err.response?.data?.message || 'Failed to load dashboard data');
+      console.error('Failed to load appointments:', err);
+      setError(err.response?.data?.message || 'Failed to load patient queue');
     } finally {
       setLoading(false);
     }
   };
 
+  const waitingPatients = patients.filter(p => p.status === 'waiting');
+  const inProgressPatients = patients.filter(p => p.status === 'in-progress');
+  const completedPatients = patients.filter(p => p.status === 'completed');
+
+  const handleGoToPatient = (patient: QueuePatient) => {
+    router.push(`/coordinator/dashboard/pre-encounter/${patient.appointmentId}`);
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  // Render a patient card
+  const PatientCard = ({ patient, showGoButton = true }: { patient: QueuePatient; showGoButton?: boolean }) => (
+    <div className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+      <div className="flex items-center gap-4">
+        {/* Avatar */}
+        <div className="w-[48px] h-[48px] rounded-full bg-[#e5e7eb] flex items-center justify-center">
+          <User className="w-6 h-6 text-[#9ca3af]" />
+        </div>
+        
+        {/* Patient Info */}
+        <div>
+          <h4 className="text-[16px] font-semibold text-[#101828]" style={{ fontFamily: 'Inter, sans-serif' }}>
+            {patient.patientName}
+          </h4>
+          <p className="text-[14px] text-[#475467]" style={{ fontFamily: 'Inter, sans-serif' }}>
+            UHID: {patient.uhid}
+          </p>
+          <div className="flex items-center gap-4 mt-2">
+            <span className="flex items-center gap-1 text-[13px] text-[#475467]">
+              <Clock className="w-4 h-4" />
+              {patient.appointmentTime}
+            </span>
+            {/* Payment Status Indicator */}
+            <StatusIndicator label="Payment" status={patient.paymentStatus} />
+            {/* Vitals Status Indicator */}
+            <StatusIndicator label="Vitals" status={patient.vitalsStatus} />
+          </div>
+        </div>
+      </div>
+      
+      {/* Go Button */}
+      {showGoButton && (
+        <button
+          onClick={() => handleGoToPatient(patient)}
+          className="flex items-center gap-2 px-4 py-2 bg-[#2563eb] text-white rounded-lg hover:bg-[#1d4ed8] transition-colors text-[14px] font-medium"
+        >
+          Go
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+
   if (loading) {
     return (
-      <div>
-        <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-4 w-32" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-20" />
-              </CardContent>
-            </Card>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-2"></div>
+            <div className="h-5 w-32 bg-gray-100 rounded animate-pulse"></div>
+          </div>
+        </div>
+        <div className="bg-white rounded-[16px] p-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-20 bg-gray-100 rounded-lg mb-4 animate-pulse"></div>
           ))}
         </div>
       </div>
@@ -70,160 +220,124 @@ export default function CoordinatorDashboard() {
 
   if (error) {
     return (
-      <div>
-        <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+      <div className="bg-white rounded-[16px] border border-red-200 p-8 text-center">
+        <div className="text-red-600 mb-4">{error}</div>
+        <button 
+          onClick={loadTodayAppointments}
+          className="px-4 py-2 bg-[#10B981] text-white rounded-lg hover:bg-[#059669] transition-colors"
+        >
+          Try Again
+        </button>
       </div>
     );
   }
 
-  const statCards = [
-    {
-      title: 'Total Patients',
-      value: stats?.totalPatients || 0,
-      icon: Users,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-    },
-    {
-      title: 'New Patients (This Month)',
-      value: stats?.newPatientsThisMonth || 0,
-      icon: UserPlus,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50',
-    },
-    {
-      title: 'Total Doctors',
-      value: stats?.totalDoctors || 0,
-      icon: TrendingUp,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50',
-    },
-    {
-      title: 'Today\'s Appointments',
-      value: stats?.todayAppointments || 0,
-      icon: Calendar,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50',
-    },
-    {
-      title: 'Completed Today',
-      value: stats?.todayCompleted || 0,
-      icon: CheckCircle,
-      color: 'text-emerald-600',
-      bgColor: 'bg-emerald-50',
-    },
-    {
-      title: 'Upcoming Today',
-      value: stats?.upcomingToday || 0,
-      icon: Clock,
-      color: 'text-amber-600',
-      bgColor: 'bg-amber-50',
-    },
-  ];
-
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-2">Welcome back! Here's your hospital overview.</p>
+    <div className="space-y-6">
+      {/* Header with Status Counts */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-[24px] font-semibold text-[#101828]" style={{ fontFamily: 'Inter, sans-serif' }}>
+            OPD - Patient Queue
+          </h2>
+          <p className="text-[14px] text-[#475467]" style={{ fontFamily: 'Inter, sans-serif' }}>
+            Today: {formatDate(today)}
+          </p>
+        </div>
+        
+        {/* Status Legend */}
+        <div className="flex flex-col gap-2 text-[12px] text-[#475467]">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-white border-2 border-gray-300" />
+            <span>Not Started</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-orange-400" />
+            <span>Under Process</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-green-500" />
+            <span>Done</span>
+          </div>
+        </div>
+        
+        {/* Status Counts */}
+        <div className="flex gap-8">
+          <div className="text-center">
+            <p className="text-[14px] text-[#475467]" style={{ fontFamily: 'Inter, sans-serif' }}>Waiting</p>
+            <p className="text-[24px] font-bold text-[#101828]" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {waitingPatients.length}
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="text-[14px] text-[#475467]" style={{ fontFamily: 'Inter, sans-serif' }}>In Progress</p>
+            <p className="text-[24px] font-bold text-[#101828]" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {inProgressPatients.length}
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="text-[14px] text-[#475467]" style={{ fontFamily: 'Inter, sans-serif' }}>Completed</p>
+            <p className="text-[24px] font-bold text-[#101828]" style={{ fontFamily: 'Inter, sans-serif' }}>
+              {completedPatients.length}
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {statCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Card key={card.title} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  {card.title}
-                </CardTitle>
-                <div className={`p-2 rounded-lg ${card.bgColor}`}>
-                  <Icon className={`h-5 w-5 ${card.color}`} />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-gray-900">{card.value}</div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Appointment Trends Chart */}
-      {trends.length > 0 && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Appointment Trends (Last 7 Days)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {trends.map((trend) => (
-                <div key={trend.date} className="flex items-center">
-                  <div className="w-24 text-sm text-gray-600">
-                    {new Date(trend.date).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      {/* Total bar */}
-                      <div
-                        className="h-8 bg-blue-500 rounded flex items-center justify-center text-white text-sm font-medium"
-                        style={{ width: `${Math.max((trend.total / 50) * 100, 5)}%` }}
-                      >
-                        {trend.total}
-                      </div>
-                      <span className="text-sm text-gray-600">
-                        ({trend.completed} completed, {trend.cancelled} cancelled)
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+      {/* Waiting Queue Section */}
+      <div className="bg-white rounded-[16px] shadow-sm overflow-hidden">
+        <div className="bg-[#fef9e7] px-6 py-3">
+          <h3 className="text-[16px] font-semibold text-[#101828]" style={{ fontFamily: 'Inter, sans-serif' }}>
+            Waiting Queue ({waitingPatients.length})
+          </h3>
+        </div>
+        
+        <div className="divide-y divide-gray-100">
+          {waitingPatients.length === 0 ? (
+            <div className="px-6 py-8 text-center text-[#475467]">
+              No patients currently waiting
             </div>
-          </CardContent>
-        </Card>
+          ) : (
+            waitingPatients.map((patient) => (
+              <PatientCard key={patient.appointmentId} patient={patient} />
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* In Progress Section */}
+      {inProgressPatients.length > 0 && (
+        <div className="bg-white rounded-[16px] shadow-sm overflow-hidden">
+          <div className="bg-[#e8f4fd] px-6 py-3">
+            <h3 className="text-[16px] font-semibold text-[#101828]" style={{ fontFamily: 'Inter, sans-serif' }}>
+              In Progress ({inProgressPatients.length})
+            </h3>
+          </div>
+          
+          <div className="divide-y divide-gray-100">
+            {inProgressPatients.map((patient) => (
+              <PatientCard key={patient.appointmentId} patient={patient} showGoButton={false} />
+            ))}
+          </div>
+        </div>
       )}
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <a
-              href="/coordinator/patients"
-              className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
-            >
-              <Users className="h-6 w-6 text-blue-600 mb-2" />
-              <h3 className="font-semibold">Manage Patients</h3>
-              <p className="text-sm text-gray-600">View and manage all hospital patients</p>
-            </a>
-            <a
-              href="/coordinator/appointments"
-              className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
-            >
-              <Calendar className="h-6 w-6 text-blue-600 mb-2" />
-              <h3 className="font-semibold">Manage Appointments</h3>
-              <p className="text-sm text-gray-600">Schedule and track appointments</p>
-            </a>
-            <a
-              href="/coordinator/patients?action=create"
-              className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
-            >
-              <UserPlus className="h-6 w-6 text-blue-600 mb-2" />
-              <h3 className="font-semibold">Add New Patient</h3>
-              <p className="text-sm text-gray-600">Register a new patient</p>
-            </a>
+      {/* Completed Section */}
+      {completedPatients.length > 0 && (
+        <div className="bg-white rounded-[16px] shadow-sm overflow-hidden">
+          <div className="bg-[#e8fdf5] px-6 py-3">
+            <h3 className="text-[16px] font-semibold text-[#101828]" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Completed ({completedPatients.length})
+            </h3>
           </div>
-        </CardContent>
-      </Card>
+          
+          <div className="divide-y divide-gray-100">
+            {completedPatients.map((patient) => (
+              <PatientCard key={patient.appointmentId} patient={patient} showGoButton={false} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
