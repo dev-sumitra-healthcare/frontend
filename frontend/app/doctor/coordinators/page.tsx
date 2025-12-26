@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -13,25 +12,13 @@ import {
   DialogTitle,
   DialogTrigger
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import StatusBadge from "@/components/doctor/StatusBadge";
 import { toast } from "sonner";
 import {
-  Users,
   Plus,
   Trash2,
-  ToggleLeft,
-  ToggleRight,
-  Mail,
-  Phone,
-  Calendar,
+  Pencil,
+  Key,
   AlertCircle,
   Copy
 } from "lucide-react";
@@ -42,6 +29,9 @@ import {
   deleteDoctorCoordinator,
   type DoctorCoordinator
 } from "@/lib/api";
+
+// Permissions for display
+const defaultPermissions = ["View Cases", "Book Appts", "Manage OPD"];
 
 export default function CoordinatorsPage() {
   const [coordinators, setCoordinators] = useState<DoctorCoordinator[]>([]);
@@ -90,10 +80,12 @@ export default function CoordinatorsPage() {
         setNewCoordinator({ fullName: "", email: "", phoneNumber: "" });
         toast.success("Coordinator added successfully");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating coordinator:", error);
-      const msg = error.response?.data?.message || "Failed to create coordinator";
-      toast.error(msg);
+      const errorMessage = error && typeof error === 'object' && 'response' in error 
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message 
+        : undefined;
+      toast.error(errorMessage || "Failed to create coordinator");
     } finally {
       setCreating(false);
     }
@@ -134,23 +126,23 @@ export default function CoordinatorsPage() {
     toast.success("Copied to clipboard");
   };
 
+  // Generate mock IDs for display
+  const getDisplayId = (index: number) => `C00${index + 1}`;
+
   return (
-    <div className="space-y-6 md:space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Users className="h-6 w-6 md:h-7 md:w-7 text-blue-600" />
-            Coordinators
-          </h1>
-          <p className="text-sm md:text-base text-gray-600 mt-1">
-            Manage coordinators in your hospital
+          <h1 className="text-2xl font-bold text-gray-900">Coordinator Management</h1>
+          <p className="text-sm text-gray-600">
+            Manage coordinator accounts and permissions
           </p>
         </div>
 
         <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Add Coordinator
             </Button>
@@ -159,7 +151,7 @@ export default function CoordinatorsPage() {
             <DialogHeader>
               <DialogTitle>Add New Coordinator</DialogTitle>
               <DialogDescription>
-                Create a new coordinator account for your hospital. They'll receive login credentials.
+                Create a new coordinator account. They&apos;ll receive login credentials.
               </DialogDescription>
             </DialogHeader>
 
@@ -185,7 +177,7 @@ export default function CoordinatorsPage() {
                 <label className="text-sm font-medium">Phone Number</label>
                 <Input
                   type="tel"
-                  placeholder="+91 98765 43210"
+                  placeholder="+1 555-0201"
                   value={newCoordinator.phoneNumber}
                   onChange={(e) => setNewCoordinator(prev => ({ ...prev, phoneNumber: e.target.value }))}
                 />
@@ -227,7 +219,7 @@ export default function CoordinatorsPage() {
                 {tempPassword ? "Done" : "Cancel"}
               </Button>
               {!tempPassword && (
-                <Button onClick={handleCreate} disabled={creating}>
+                <Button onClick={handleCreate} disabled={creating} className="bg-blue-600 hover:bg-blue-700">
                   {creating ? "Creating..." : "Create Coordinator"}
                 </Button>
               )}
@@ -236,160 +228,118 @@ export default function CoordinatorsPage() {
         </Dialog>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Total Staff</p>
-                <p className="text-2xl font-bold">{coordinators.length}</p>
-              </div>
-              <Users className="h-10 w-10 text-blue-100" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Active</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {coordinators.filter(c => c.isActive).length}
-                </p>
-              </div>
-              <ToggleRight className="h-10 w-10 text-green-100" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Inactive</p>
-                <p className="text-2xl font-bold text-gray-400">
-                  {coordinators.filter(c => !c.isActive).length}
-                </p>
-              </div>
-              <ToggleLeft className="h-10 w-10 text-gray-100" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Coordinators Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Coordinators</CardTitle>
-          <CardDescription>Manage coordinators in your hospital</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-          ) : coordinators.length === 0 ? (
-            <div className="text-center py-12">
-              <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-1">No coordinators yet</h3>
-              <p className="text-gray-500 mb-4">Add coordinators to help manage appointments</p>
-              <Button onClick={() => setAddDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add First Coordinator
-              </Button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {coordinators.map((coordinator) => (
-                    <TableRow key={coordinator.id}>
-                      <TableCell className="font-medium">{coordinator.fullName}</TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-sm">
-                            <Mail className="h-3 w-3 text-gray-400" />
-                            {coordinator.email}
-                          </div>
-                          {coordinator.phoneNumber && (
-                            <div className="flex items-center gap-2 text-sm text-gray-500">
-                              <Phone className="h-3 w-3 text-gray-400" />
-                              {coordinator.phoneNumber}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={coordinator.isActive ? "default" : "secondary"}>
-                          {coordinator.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-sm text-gray-500">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(coordinator.createdAt).toLocaleDateString()}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleToggleAccess(coordinator.id, coordinator.isActive)}
-                          >
-                            {coordinator.isActive ? (
-                              <ToggleRight className="h-4 w-4 text-green-600" />
-                            ) : (
-                              <ToggleLeft className="h-4 w-4 text-gray-400" />
-                            )}
-                          </Button>
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* Table Header */}
+        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+          <div className="grid grid-cols-12 gap-4 text-sm font-medium text-gray-700">
+            <div className="col-span-1">ID</div>
+            <div className="col-span-2">Name</div>
+            <div className="col-span-2">Email</div>
+            <div className="col-span-2">Phone</div>
+            <div className="col-span-1">Status</div>
+            <div className="col-span-2">Permissions</div>
+            <div className="col-span-2 text-center">Actions</div>
+          </div>
+        </div>
 
-                          <Dialog open={deleteConfirmId === coordinator.id} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
-                            <DialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setDeleteConfirmId(coordinator.id)}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Remove Coordinator?</DialogTitle>
-                                <DialogDescription>
-                                  Are you sure you want to remove {coordinator.fullName}? This action cannot be undone.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <DialogFooter>
-                                <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
-                                  Cancel
-                                </Button>
-                                <Button variant="destructive" onClick={() => handleDelete(coordinator.id)}>
-                                  Remove
-                                </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+        {/* Table Body */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : coordinators.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 font-medium">No coordinators yet</p>
+            <p className="text-sm text-gray-400 mt-1">Add coordinators to help manage appointments</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {coordinators.map((coordinator, index) => (
+              <div
+                key={coordinator.id}
+                className="grid grid-cols-12 gap-4 items-center px-6 py-4 hover:bg-gray-50 transition-colors"
+              >
+                {/* ID */}
+                <div className="col-span-1 text-sm text-gray-600">
+                  {getDisplayId(index)}
+                </div>
+
+                {/* Name */}
+                <div className="col-span-2 font-medium text-gray-900">
+                  {coordinator.fullName}
+                </div>
+
+                {/* Email */}
+                <div className="col-span-2 text-sm text-gray-600">
+                  {coordinator.email}
+                </div>
+
+                {/* Phone */}
+                <div className="col-span-2 text-sm text-gray-600">
+                  {coordinator.phoneNumber || "-"}
+                </div>
+
+                {/* Status */}
+                <div className="col-span-1">
+                  <StatusBadge variant={coordinator.isActive ? "active" : "inactive"}>
+                    {coordinator.isActive ? "active" : "inactive"}
+                  </StatusBadge>
+                </div>
+
+                {/* Permissions */}
+                <div className="col-span-2 flex flex-wrap gap-1">
+                  {defaultPermissions.map((perm) => (
+                    <StatusBadge key={perm} variant="permission" className="text-xs">
+                      {perm}
+                    </StatusBadge>
                   ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                </div>
+
+                {/* Actions */}
+                <div className="col-span-2 flex items-center justify-center gap-1">
+                  <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button 
+                    onClick={() => handleToggleAccess(coordinator.id, coordinator.isActive)}
+                    className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                  >
+                    <Key className="h-4 w-4" />
+                  </button>
+
+                  <Dialog open={deleteConfirmId === coordinator.id} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+                    <DialogTrigger asChild>
+                      <button
+                        onClick={() => setDeleteConfirmId(coordinator.id)}
+                        className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Remove Coordinator?</DialogTitle>
+                        <DialogDescription>
+                          Are you sure you want to remove {coordinator.fullName}? This action cannot be undone.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
+                          Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={() => handleDelete(coordinator.id)}>
+                          Remove
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -72,7 +72,7 @@ export default function PrescriptionPanel({ encounterId, patient }: Prescription
   const [showPreview, setShowPreview] = useState(false);
 
   const form = useForm<PrescriptionFormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any, // Type assertion due to zod inference
     defaultValues: {
       templateId: undefined,
       medications: [],

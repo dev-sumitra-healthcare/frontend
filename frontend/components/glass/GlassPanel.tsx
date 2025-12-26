@@ -121,13 +121,21 @@ export const GlassPanel = React.forwardRef<HTMLDivElement, GlassPanelProps>(
         ref={ref}
         className={panelClasses}
         initial={{ opacity: 0, scale: 0.9 }}
-        animate={{
-          opacity: 1,
-          scale: 1,
-          ...floatAnimation,
-        }}
+        animate={
+          floating
+            ? {
+                opacity: 1,
+                scale: 1,
+                y: [0, -10, 0],
+              }
+            : { opacity: 1, scale: 1 }
+        }
         exit={{ opacity: 0, scale: 0.9 }}
-        transition={{ duration: 0.3 }}
+        transition={
+          floating
+            ? { duration: 3, repeat: Infinity, ease: "easeInOut" }
+            : { duration: 0.3 }
+        }
         {...motionProps}
       >
         {children}

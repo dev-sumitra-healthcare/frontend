@@ -1,19 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { 
-  LayoutDashboard, 
-  Users, 
-  Calendar, 
-  Settings, 
-  LogOut,
-  Stethoscope 
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import DoctorHeader from "@/components/doctor/DoctorHeader";
+import DoctorTabs from "@/components/doctor/DoctorTabs";
 
-// Pages that should NOT have the sidebar (public/auth pages)
-// Exact match for /doctor landing page, prefix match for /doctor/login and /doctor/register
+// Pages that should NOT have the dashboard layout (public/auth pages)
 const PUBLIC_ROUTES = ['/doctor/login', '/doctor/register'];
 const EXACT_PUBLIC_ROUTES = ['/doctor'];
 
@@ -23,76 +15,59 @@ export default function DoctorLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [doctorName, setDoctorName] = useState("Sarah Johnson");
 
-  // Check if current route is a public route (no sidebar needed)
-  const isPublicRoute = PUBLIC_ROUTES.some(route => pathname?.startsWith(route)) ||
-    EXACT_PUBLIC_ROUTES.includes(pathname || '');
+  useEffect(() => {
+    loadDoctorInfo();
+  }, []);
 
-  // For public routes (login/register/landing), render children without sidebar
-  if (isPublicRoute) {
-    return <>{children}</>;
-  }
-
-  const navigation = [
-    { name: "Dashboard", href: "/doctor/dashboard", icon: LayoutDashboard },
-    { name: "My Patients", href: "/doctor/patients", icon: Users },
-    { name: "Schedule", href: "/doctor/schedule", icon: Calendar },
-    { name: "Settings", href: "/doctor/settings", icon: Settings },
-  ];
+  const loadDoctorInfo = () => {
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser);
+          setDoctorName(user.fullName || user.full_name || 'Doctor');
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
+    }
+  };
 
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('user');
-      window.location.href = '/doctor/login';
+      router.push('/doctor/login');
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col">
-        <div className="p-6 border-b border-gray-200 flex items-center gap-2">
-          <Stethoscope className="h-6 w-6 text-primary" />
-          <span className="font-bold text-xl">MedMitra MD</span>
-        </div>
-        
-        <nav className="flex-1 p-4 space-y-1">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link key={item.name} href={item.href}>
-                <Button
-                  variant={isActive ? "secondary" : "ghost"}
-                  className={`w-full justify-start ${isActive ? "bg-blue-50 text-blue-700" : "text-gray-600"}`}
-                >
-                  <item.icon className="mr-2 h-4 w-4" />
-                  {item.name}
-                </Button>
-              </Link>
-            );
-          })}
-        </nav>
+  // Check if current route is a public route (no layout needed)
+  const isPublicRoute = PUBLIC_ROUTES.some(route => pathname?.startsWith(route)) ||
+    EXACT_PUBLIC_ROUTES.includes(pathname || '');
 
-        <div className="p-4 border-t border-gray-200">
-          <Button 
-            variant="ghost" 
-            className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-            onClick={handleLogout}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign Out
-          </Button>
-        </div>
-      </aside>
+  // For public routes (login/register/landing), render children without layout
+  if (isPublicRoute) {
+    return <>{children}</>;
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50">
+      {/* Header */}
+      <DoctorHeader 
+        doctorName={doctorName} 
+        onLogout={handleLogout}
+      />
+      
+      {/* Navigation Tabs */}
+      <DoctorTabs />
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="p-8">
-          {children}
-        </div>
+      <main className="max-w-[1400px] mx-auto px-6 py-6">
+        {children}
       </main>
     </div>
   );
 }
-

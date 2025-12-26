@@ -83,6 +83,8 @@ export default function PatientDashboardPage() {
   const [diagnosisFilter, setDiagnosisFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(null);
+  const [showRecordModal, setShowRecordModal] = useState(false);
   
   // Book Appointment state
   const [doctors, setDoctors] = useState<DoctorCard[]>([]);
@@ -467,7 +469,13 @@ export default function PatientDashboardPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <button className="flex items-center gap-2 px-4 py-2 bg-[#155dfc] text-white text-[14px] rounded-lg hover:bg-[#1d4ed8] transition-colors">
+                        <button 
+                          onClick={() => {
+                            setSelectedRecord(record);
+                            setShowRecordModal(true);
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-[#155dfc] text-white text-[14px] rounded-lg hover:bg-[#1d4ed8] transition-colors"
+                        >
                           <Eye className="w-4 h-4" />
                           View Details
                         </button>
@@ -1583,6 +1591,116 @@ export default function PatientDashboardPage() {
         onConfirm={handleConfirmBooking}
         isLoading={isBookingLoading}
       />
+      {/* Health Record Details Modal */}
+      {showRecordModal && selectedRecord && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowRecordModal(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-md min-w-[350px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 pb-2">
+              <div>
+                <h3 className="text-[20px] font-semibold text-[#101828]">
+                  Visit Details
+                </h3>
+                <p className="text-[14px] text-[#475467]">
+                  {new Date(selectedRecord.date).toISOString().split('T')[0]}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowRecordModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-[#9ca3af]" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 pt-4 space-y-6">
+              {/* Doctor Info Box */}
+              <div className="p-4 bg-[#f0f7ff] rounded-xl border border-[#e0efff]">
+                <p className="font-semibold text-[#101828] text-[16px]">
+                  {selectedRecord.doctor?.fullName || 'Doctor'}
+                </p>
+                <p className="text-[14px] text-[#475467]">
+                  {selectedRecord.doctor?.specialty || 'Specialist'}
+                </p>
+                <p className="text-[14px] text-[#475467]">
+                  Visit Type: {selectedRecord.chiefComplaint || 'Consultation'}
+                </p>
+              </div>
+
+              {/* Diagnosis */}
+              <div>
+                <h4 className="text-[16px] font-semibold text-[#101828] mb-3">Diagnosis</h4>
+                <div className="flex flex-wrap gap-2">
+                  {selectedRecord.diagnosis ? (
+                    selectedRecord.diagnosis.split(',').map((d: string, i: number) => (
+                      <span 
+                        key={i} 
+                        className="px-4 py-1.5 bg-[#fef3c7] text-[#b45309] text-[14px] rounded-full font-medium"
+                      >
+                        {d.trim()}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[14px] text-[#667085] italic">No diagnosis recorded</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Symptoms */}
+              <div>
+                <h4 className="text-[16px] font-semibold text-[#101828] mb-3">Symptoms</h4>
+                <div className="flex flex-wrap gap-2">
+                  {selectedRecord.vitals?.symptoms ? (
+                    (Array.isArray(selectedRecord.vitals.symptoms) 
+                      ? selectedRecord.vitals.symptoms 
+                      : String(selectedRecord.vitals.symptoms).split(',')
+                    ).map((s: string, i: number) => (
+                      <span 
+                        key={i} 
+                        className="px-4 py-1.5 bg-[#fee2e2] text-[#dc2626] text-[14px] rounded-full font-medium"
+                      >
+                        {s.trim()}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[14px] text-[#667085] italic">No symptoms recorded</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Medications Prescribed */}
+              <div>
+                <h4 className="text-[16px] font-semibold text-[#101828] mb-3">Medications Prescribed</h4>
+                <div className="space-y-2">
+                  {selectedRecord.vitals?.medications && Array.isArray(selectedRecord.vitals.medications) && selectedRecord.vitals.medications.length > 0 ? (
+                    selectedRecord.vitals.medications.map((med: any, i: number) => (
+                      <div 
+                        key={i} 
+                        className="p-3 bg-[#fdf4ff] rounded-lg text-[#101828] text-[14px]"
+                      >
+                        {typeof med === 'string' ? med : `${med.name} ${med.dosage || ''}`}
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-[14px] text-[#667085] italic">No medications prescribed</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Doctor's Notes */}
+              <div>
+                <h4 className="text-[16px] font-semibold text-[#101828] mb-3">Doctor's Notes</h4>
+                <div className="p-4 bg-[#faf5ff] rounded-lg">
+                  <p className="text-[14px] text-[#475467]">
+                    {selectedRecord.advice || selectedRecord.vitals?.notes || 'No notes available'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

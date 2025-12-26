@@ -18,7 +18,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { 
-  getDoctorDashboard, 
+  getTodaysQueue,
+  getDoctorActionItems,
+  getDoctorStats,
   DashboardQueueItem, 
   DashboardActionItems, 
   DashboardPerformanceStats 
@@ -83,17 +85,38 @@ export default function DoctorDashboard() {
   const loadDashboard = async () => {
     try {
       setIsLoading(true);
-      const response = await getDoctorDashboard();
       
-      if (response.data.status === 'success') {
-        setQueue(response.data.data.todaysQueue || []);
-        setActionItems(response.data.data.actionItems);
-        setStats(response.data.data.performanceStats);
+      const [queueRes, actionItemsRes, statsRes] = await Promise.allSettled([
+        getTodaysQueue(),
+        getDoctorActionItems(),
+        getDoctorStats()
+      ]);
+
+      // Process Queue
+      if (queueRes.status === 'fulfilled' && queueRes.value.data.status === 'success') {
+        setQueue(queueRes.value.data.data || []);
+      } else {
+        console.error('Failed to load queue:', queueRes.status === 'rejected' ? queueRes.reason : 'Invalid response');
       }
+
+      // Process Action Items
+      if (actionItemsRes.status === 'fulfilled' && actionItemsRes.value.data.status === 'success') {
+        setActionItems(actionItemsRes.value.data.data);
+      } else {
+        console.error('Failed to load action items:', actionItemsRes.status === 'rejected' ? actionItemsRes.reason : 'Invalid response');
+      }
+
+      // Process Stats
+      if (statsRes.status === 'fulfilled' && statsRes.value.data.status === 'success') {
+        setStats(statsRes.value.data.data);
+      } else {
+        console.error('Failed to load stats:', statsRes.status === 'rejected' ? statsRes.reason : 'Invalid response');
+      }
+
     } catch (error: any) {
       console.error('Error loading dashboard:', error);
       toast.error('Failed to load dashboard', {
-        description: error.response?.data?.message || 'Please try again'
+        description: 'Some data could not be loaded. Please try again.'
       });
     } finally {
       setIsLoading(false);

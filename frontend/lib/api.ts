@@ -595,10 +595,11 @@ export interface TriageVitals {
   temp?: number;      // Temperature in F
   weight?: number;    // Weight in kg
   height?: number;    // Height in cm
+  spo2?: number;      // SpO2 percentage
 }
 
 export interface TriagePayment {
-  amount: number;
+  amount: number | string;  // Can be number or decimal string like "150.00"
   method: 'Cash' | 'UPI' | 'Card' | 'Insurance';
   status: 'pending' | 'paid' | 'failed';
   transactionId?: string;
@@ -698,9 +699,15 @@ export interface DashboardQueueItem {
     fullName: string;
     uhid: string | null;
     mid: string | null;
+    age?: number | null;
+    gender?: string | null;
   };
-  vitals: Record<string, any> | null;
+  vitals: Record<string, unknown> | null;
   triageRecordedAt: string | null;
+  paymentStatus?: 'pending' | 'paid' | 'completed' | 'failed' | null;
+  paymentAmount?: number | null;
+  encounterStatus?: string | null;
+  encounterId?: string | null;
 }
 
 export interface DashboardActionItems {
@@ -891,6 +898,51 @@ export const getPerformanceStats = async (): Promise<AxiosResponse<PerformanceSt
 
 // --- API Functions for Encounter ---
 // Note: These endpoints may need to be implemented in the backend
+
+// Search encounters (Past Cases)
+export interface SearchEncountersParams {
+  diagnosis?: string;
+  symptoms?: string;
+  patientName?: string;
+  patientId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface EncounterSearchResult {
+  id: string;
+  appointmentId: string;
+  patientId: string;
+  patientName: string;
+  patientUhid: string;
+  status: string;
+  diagnosis: Array<{ code?: string; description: string; confidence?: string }> | null;
+  chiefComplaint: string | null;
+  symptoms: string[] | null;
+  vitalSigns: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SearchEncountersResponse {
+  success: boolean;
+  message: string;
+  data: {
+    encounters: EncounterSearchResult[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  };
+}
+
+export const searchEncounters = async (params?: SearchEncountersParams): Promise<AxiosResponse<SearchEncountersResponse>> => {
+  return apiClient.get("/encounters/search", { params });
+};
 
 // 14. Get Encounter Details (Create encounter bundle with AI analysis)
 export const getEncounterDetails = async (appointmentId: string): Promise<AxiosResponse<EncounterDataResponse>> => {

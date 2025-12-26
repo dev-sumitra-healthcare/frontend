@@ -3,7 +3,7 @@ import { motion, type HTMLMotionProps } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 export interface GlassInputProps
-  extends Omit<HTMLMotionProps<'input'>, 'ref' | 'type'> {
+  extends Omit<HTMLMotionProps<'input'>, 'ref' | 'type' | 'size'> {
   /** Input type */
   type?: 'text' | 'email' | 'password' | 'tel' | 'url' | 'search' | 'number';
   /** Input variant */
@@ -14,8 +14,10 @@ export interface GlassInputProps
   error?: boolean;
   /** Success state */
   success?: boolean;
-  /** Icon before input */
+  /** Icon before input (alias: icon) */
   iconBefore?: React.ReactNode;
+  /** Icon (alias for iconBefore) */
+  icon?: React.ReactNode;
   /** Icon after input */
   iconAfter?: React.ReactNode;
   /** Full width */
@@ -52,6 +54,7 @@ export const GlassInput = React.forwardRef<HTMLInputElement, GlassInputProps>(
       error = false,
       success = false,
       iconBefore,
+      icon,
       iconAfter,
       fullWidth = false,
       label,
@@ -63,7 +66,23 @@ export const GlassInput = React.forwardRef<HTMLInputElement, GlassInputProps>(
     ref
   ) => {
     const hasError = error || !!errorMessage;
-    const hasIcon = iconBefore || iconAfter;
+    // Support `icon` as alias for `iconBefore`
+    // Handle both ReactNode and component types
+    const rawIcon = iconBefore || icon;
+    const leadingIcon = React.useMemo(() => {
+      if (!rawIcon) return null;
+      
+      // If it's already a react element, return it
+      if (React.isValidElement(rawIcon)) {
+        return rawIcon;
+      }
+      
+      // Otherwise treat it as a component (function or forwardRef) and render it
+      return React.createElement(rawIcon as unknown as React.ComponentType<{ className?: string }>, { 
+        className: 'w-full h-full' 
+      });
+    }, [rawIcon]);
+    const hasIcon = leadingIcon || iconAfter;
 
     // Size classes
     const sizeClasses = {
@@ -94,7 +113,7 @@ export const GlassInput = React.forwardRef<HTMLInputElement, GlassInputProps>(
       // Remove default focus ring (we'll use parent border)
       'focus:outline-none',
       // Padding adjustments for icons
-      iconBefore && 'pl-10',
+      leadingIcon && 'pl-10',
       iconAfter && 'pr-10',
       className
     );
@@ -137,7 +156,7 @@ export const GlassInput = React.forwardRef<HTMLInputElement, GlassInputProps>(
         >
           <div className={containerClasses}>
             {/* Icon before */}
-            {iconBefore && (
+            {leadingIcon && (
               <div
                 className={cn(
                   'absolute left-3 flex items-center pointer-events-none',
@@ -149,7 +168,7 @@ export const GlassInput = React.forwardRef<HTMLInputElement, GlassInputProps>(
                       : 'text-ocean-mid dark:text-white/70'
                 )}
               >
-                {iconBefore}
+                {leadingIcon}
               </div>
             )}
 

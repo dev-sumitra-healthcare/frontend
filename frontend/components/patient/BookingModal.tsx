@@ -15,7 +15,12 @@ interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   doctor: DoctorInfo | null;
-  onConfirm: (data: { doctorId: string; date: string; timeSlot: string; paymentMethod: string }) => void;
+  onConfirm: (data: {
+    doctorId: string;
+    date: string;
+    timeSlot: string;
+    paymentMethod: string;
+  }) => void;
   isLoading?: boolean;
 }
 
@@ -51,9 +56,9 @@ export default function BookingModal({
 }: BookingModalProps) {
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] =
+    useState<string | null>(null);
 
-  // Reset state when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
       setSelectedDate("");
@@ -64,29 +69,33 @@ export default function BookingModal({
 
   if (!isOpen || !doctor) return null;
 
-  const timeSlots = doctor.availableSlots?.length ? doctor.availableSlots : TIME_SLOTS;
+  const timeSlots = doctor.availableSlots?.length
+    ? doctor.availableSlots
+    : TIME_SLOTS;
+
   const consultationFee = doctor.consultationFee ?? 150;
-  const isFormValid = selectedDate && selectedTimeSlot && selectedPaymentMethod;
+  const isFormValid =
+    selectedDate && selectedTimeSlot && selectedPaymentMethod;
 
   const handleConfirm = () => {
-    if (isFormValid) {
-      onConfirm({
-        doctorId: doctor.id,
-        date: selectedDate,
-        timeSlot: selectedTimeSlot!,
-        paymentMethod: selectedPaymentMethod!,
-      });
-    }
+    if (!isFormValid) return;
+
+    onConfirm({
+      doctorId: doctor.id,
+      date: selectedDate,
+      timeSlot: selectedTimeSlot!,
+      paymentMethod: selectedPaymentMethod!,
+    });
   };
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto overflow-x-hidden outline-none focus:outline-none"
+      className="fixed inset-0 z-[100] flex items-center justify-center"
       aria-hidden={!isOpen}
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-[2px] transition-opacity"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -96,7 +105,16 @@ export default function BookingModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Book appointment with ${doctor.fullName}`}
-        className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-[520px] sm:max-w-lg mx-4 max-h-[90vh] overflow-y-auto overflow-x-hidden"
+        className="
+          relative z-20
+          bg-white rounded-2xl shadow-2xl
+          w-full max-w-[720px]
+          mx-4 sm:mx-0
+          min-w-[280px]
+          sm:min-w-[420px]
+          flex-shrink-0
+          max-h-[90vh] overflow-y-auto
+        "
       >
         {/* Close button */}
         <button
@@ -108,34 +126,28 @@ export default function BookingModal({
           <X className="w-5 h-5" />
         </button>
 
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-5 sm:space-y-6">
           {/* Header */}
-          <h2 className="text-[18px] font-medium text-[#101828] pr-8" style={{ fontFamily: "Inter, sans-serif" }}>
+          <h2 className="text-[18px] font-medium text-[#101828] pr-8">
             Book Appointment with {doctor.fullName}
           </h2>
 
           {/* Doctor Info Card */}
           <div className="bg-[#f0f7ff] border-l-4 border-[#155dfc] rounded-r-lg p-4">
-            <p className="text-[16px] font-medium text-[#101828]" style={{ fontFamily: "Inter, sans-serif" }}>
+            <p className="text-[16px] font-medium text-[#101828]">
               {doctor.fullName}
             </p>
-            <p className="text-[14px] text-[#475467]" style={{ fontFamily: "Inter, sans-serif" }}>
+            <p className="text-[14px] text-[#475467]">
               {doctor.specialty || "General Medicine"}
             </p>
-            <p
-              className="text-[14px] text-[#101828] font-medium mt-1"
-              style={{ fontFamily: "Inter, sans-serif" }}
-            >
+            <p className="text-[14px] text-[#101828] font-medium mt-1">
               Consultation Fee: ${consultationFee}
             </p>
           </div>
 
           {/* Select Date */}
           <div>
-            <label
-              className="block text-[14px] font-medium text-[#364153] mb-2"
-              style={{ fontFamily: "Inter, sans-serif" }}
-            >
+            <label className="block text-[14px] font-medium text-[#364153] mb-2">
               Select Date
             </label>
             <div className="relative">
@@ -144,10 +156,9 @@ export default function BookingModal({
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                min={new Date().toLocaleDateString('en-CA')}
+                min={new Date().toLocaleDateString("en-CA")}
                 onClick={(e) => e.currentTarget.showPicker?.()}
-                className="w-full h-[48px] pl-12 pr-4 rounded-lg border border-[#d0d5dd] text-[16px] text-[#101828] focus:outline-none focus:ring-2 focus:ring-[#155dfc]/30 focus:border-[#155dfc] bg-white relative"
-                style={{ fontFamily: "Inter, sans-serif" }}
+                className="w-full h-[48px] pl-12 pr-4 rounded-lg border border-[#d0d5dd] text-[16px] text-[#101828] focus:outline-none focus:ring-2 focus:ring-[#155dfc]/30 focus:border-[#155dfc] bg-white"
                 aria-label="Select appointment date"
               />
             </div>
@@ -155,21 +166,17 @@ export default function BookingModal({
 
           {/* Select Time Slot */}
           <div>
-            <label
-              className="block text-[14px] font-medium text-[#364153] mb-3"
-              style={{ fontFamily: "Inter, sans-serif" }}
-            >
+            <label className="block text-[14px] font-medium text-[#364153] mb-3">
               Select Time Slot
             </label>
 
-            {/* Responsive: 2 cols on small screens, 3 on sm+ */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
               {timeSlots.map((slot) => (
                 <button
                   key={slot}
                   type="button"
                   onClick={() => setSelectedTimeSlot(slot)}
-                  className={`w-full flex flex-col items-center justify-center p-3 rounded-lg border transition-all text-center ${
+                  className={`w-full min-h-[72px] flex flex-col items-center justify-center p-3 rounded-lg border transition-all text-center ${
                     selectedTimeSlot === slot
                       ? "bg-[#155dfc] border-[#155dfc] text-white"
                       : "bg-white border-[#d0d5dd] text-[#364153] hover:border-[#155dfc]"
@@ -177,11 +184,11 @@ export default function BookingModal({
                   aria-pressed={selectedTimeSlot === slot}
                 >
                   <Clock
-                    className={`w-5 h-5 mb-1 ${selectedTimeSlot === slot ? "text-white" : "text-[#667085]"}`}
+                    className={`w-5 h-5 mb-1 ${
+                      selectedTimeSlot === slot ? "text-white" : "text-[#667085]"
+                    }`}
                   />
-                  <span className="text-[14px] font-medium" style={{ fontFamily: "Inter, sans-serif" }}>
-                    {slot}
-                  </span>
+                  <span className="text-[14px] font-medium">{slot}</span>
                 </button>
               ))}
             </div>
@@ -189,10 +196,7 @@ export default function BookingModal({
 
           {/* Payment Method */}
           <div>
-            <label
-              className="block text-[14px] font-medium text-[#364153] mb-3"
-              style={{ fontFamily: "Inter, sans-serif" }}
-            >
+            <label className="block text-[14px] font-medium text-[#364153] mb-3">
               Payment Method
             </label>
             <div className="space-y-3">
@@ -211,12 +215,8 @@ export default function BookingModal({
                   >
                     <Icon className={`w-5 h-5 ${isSelected ? "text-[#155dfc]" : "text-[#667085]"}`} />
                     <div>
-                      <p className="text-[14px] font-medium text-[#101828]" style={{ fontFamily: "Inter, sans-serif" }}>
-                        {method.title}
-                      </p>
-                      <p className="text-[13px] text-[#667085]" style={{ fontFamily: "Inter, sans-serif" }}>
-                        {method.description}
-                      </p>
+                      <p className="text-[14px] font-medium text-[#101828]">{method.title}</p>
+                      <p className="text-[13px] text-[#667085]">{method.description}</p>
                     </div>
                   </button>
                 );
@@ -225,15 +225,15 @@ export default function BookingModal({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-4 pt-2">
+          <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
               className="flex-1 h-[48px] rounded-lg border border-[#d0d5dd] bg-white text-[#364153] text-[16px] font-medium hover:bg-gray-50 transition-colors"
-              style={{ fontFamily: "Inter, sans-serif" }}
             >
               Cancel
             </button>
+
             <button
               type="button"
               onClick={handleConfirm}
@@ -241,7 +241,6 @@ export default function BookingModal({
               className={`flex-1 h-[48px] rounded-lg text-[16px] font-medium transition-colors flex items-center justify-center gap-2 ${
                 isFormValid && !isLoading ? "bg-[#155dfc] text-white hover:bg-[#1d4ed8]" : "bg-[#d0d5dd] text-[#667085] cursor-not-allowed"
               }`}
-              style={{ fontFamily: "Inter, sans-serif" }}
               aria-disabled={!isFormValid || isLoading}
             >
               {isLoading ? (

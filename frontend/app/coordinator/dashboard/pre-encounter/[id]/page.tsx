@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Activity, DollarSign, CheckCircle, User } from 'lucide-react';
+import { ArrowLeft, Activity, DollarSign, CheckCircle, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { createTriageEncounter } from '@/lib/api';
 
 type TabType = 'vitals' | 'payment';
 
@@ -38,6 +40,7 @@ export default function PreEncounterPage() {
   const [vitalsCompleted, setVitalsCompleted] = useState(false);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // Patient info (in real app, fetch from API)
   const [patient, setPatient] = useState<PatientInfo>({
@@ -72,20 +75,68 @@ export default function PreEncounterPage() {
     }, 500);
   }, [appointmentId]);
 
-  const handleSaveVitals = () => {
-    // In real app, save to API
-    setVitalsCompleted(true);
-    setActiveTab('payment');
+  const handleSaveVitals = async () => {
+    if (!vitals.bloodPressure && !vitals.heartRate && !vitals.temperature) {
+      toast.error('Please enter at least one vital sign');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Call the triage API to save vitals (convert to numbers where needed)
+      await createTriageEncounter(appointmentId, {
+        vitals: {
+          bp: vitals.bloodPressure || undefined,
+          pulse: vitals.heartRate ? parseFloat(vitals.heartRate) : undefined,
+          temp: vitals.temperature ? parseFloat(vitals.temperature) : undefined,
+          weight: vitals.weight ? parseFloat(vitals.weight) : undefined,
+          height: vitals.height ? parseFloat(vitals.height) : undefined,
+          spo2: vitals.spO2 ? parseFloat(vitals.spO2) : undefined
+        }
+      });
+      
+      setVitalsCompleted(true);
+      setActiveTab('payment');
+      toast.success('Vitals saved successfully');
+    } catch (error: any) {
+      console.error('Error saving vitals:', error);
+      toast.error(error.response?.data?.message || 'Failed to save vitals');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleMarkPaymentCompleted = () => {
-    // In real app, save to API
-    setPaymentCompleted(true);
+  const handleMarkPaymentCompleted = async () => {
+    if (!payment.paymentMethod) {
+      toast.error('Please select a payment method');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Call the triage API to save payment (amount as decimal string)
+      const totalAmount = payment.consultationFee + payment.additionalCharges;
+      await createTriageEncounter(appointmentId, {
+        payment: {
+          amount: totalAmount.toFixed(2),
+          method: payment.paymentMethod as 'Cash' | 'UPI' | 'Card' | 'Insurance',
+          status: 'paid'
+        }
+      });
+      
+      setPaymentCompleted(true);
+      toast.success('Payment marked as completed');
+    } catch (error: any) {
+      console.error('Error saving payment:', error);
+      toast.error(error.response?.data?.message || 'Failed to save payment');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSendToDoctor = () => {
-    // In real app, update appointment status via API
+  const handleSendToDoctor = async () => {
     router.push('/coordinator/dashboard');
+    toast.success('Patient sent to doctor queue');
   };
 
   const totalAmount = payment.consultationFee + payment.additionalCharges;
@@ -272,10 +323,12 @@ export default function PreEncounterPage() {
 
               <button
                 onClick={handleSaveVitals}
-                className="w-full py-3 bg-[#2563eb] text-white rounded-lg text-[14px] font-medium hover:bg-[#1d4ed8] transition-colors"
+                disabled={saving}
+                className="w-full py-3 bg-[#2563eb] text-white rounded-lg text-[14px] font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{ fontFamily: 'Inter, sans-serif' }}
               >
-                Save Vitals & Continue to Payment
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {saving ? 'Saving...' : 'Save Vitals & Continue to Payment'}
               </button>
             </div>
           )}
@@ -316,7 +369,7 @@ export default function PreEncounterPage() {
               {/* Total Amount */}
               <div className="bg-[#f3f4f6] rounded-lg p-4">
                 <p className="text-[12px] text-[#475467] mb-1" style={{ fontFamily: 'Inter, sans-serif' }}>Total Amount</p>
-                <p className="text-[20px] font-bold text-[#101828]" style={{ fontFamily: 'Inter, sans-serif' }}>${totalAmount}</p>
+                <p className="text-[20px] font-bold text-[#101828]" style={{ fontFamily: 'Inter, sans-serif' }}>₹{totalAmount}</p>
               </div>
 
               <div>
@@ -330,20 +383,22 @@ export default function PreEncounterPage() {
                   style={{ fontFamily: 'Inter, sans-serif' }}
                 >
                   <option value="">Select payment method</option>
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
-                  <option value="upi">UPI</option>
-                  <option value="insurance">Insurance</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card</option>
+                  <option value="UPI">UPI</option>
+                  <option value="Insurance">Insurance</option>
                 </select>
               </div>
 
               {!paymentCompleted ? (
                 <button
                   onClick={handleMarkPaymentCompleted}
-                  className="w-full py-3 bg-[#2563eb] text-white rounded-lg text-[14px] font-medium hover:bg-[#1d4ed8] transition-colors"
+                  disabled={saving}
+                  className="w-full py-3 bg-[#2563eb] text-white rounded-lg text-[14px] font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   style={{ fontFamily: 'Inter, sans-serif' }}
                 >
-                  Mark Payment as Completed
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {saving ? 'Saving...' : 'Mark Payment as Completed'}
                 </button>
               ) : (
                 <div className="flex items-center gap-2 py-3 px-4 bg-[#d1fae5] text-[#10B981] rounded-lg">
