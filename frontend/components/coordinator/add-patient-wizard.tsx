@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/form";
 import { PatientRegistrationSchema } from "@/lib/schemas";
 import { toast } from "sonner";
-import { searchPatients, createPatient, registerExistingPatient } from "@/lib/api";
+import { searchCoordinatorPatients, createCoordinatorPatient, registerExistingPatient } from "@/lib/api";
 
 // Schema for the initial search step
 const SearchSchema = z.object({
@@ -60,7 +60,7 @@ export function AddPatientWizard() {
   // Search Handler
   const onSearch = async (data: z.infer<typeof SearchSchema>) => {
     try {
-      const response = await searchPatients(data.query);
+      const response = await searchCoordinatorPatients(data.query);
       setSearchResults(response.data.data.results || []);
       setStep("results");
     } catch (error) {
@@ -84,11 +84,21 @@ export function AddPatientWizard() {
   // Register New Handler
   const onRegister = async (data: z.infer<typeof PatientRegistrationSchema>) => {
     try {
+      // Construct payload compatible with CoordinatorCreatePatientRequest
       const payload = {
-        ...data,
-        allergies: data.allergies ? data.allergies.split(",").map(s => s.trim()) : [],
+        fullName: data.fullName,
+        phone: data.phone,
+        email: data.email || undefined,
+        dateOfBirth: data.dateOfBirth,
+        gender: data.gender,
+        bloodGroup: data.bloodType as 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-' | undefined,
+        // Flatten address object to string if provided
+        address: data.address?.street || undefined,
+        city: data.address?.city || undefined,
+        state: data.address?.state || undefined,
+        pincode: data.address?.zipCode || undefined,
       };
-      await createPatient(payload);
+      await createCoordinatorPatient(payload);
       toast.success("Patient registered successfully!");
       setIsOpen(false);
       resetWizard();
