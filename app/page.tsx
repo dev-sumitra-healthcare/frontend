@@ -1,21 +1,11 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { PublicNav } from '@/components/layout/PublicNav';
-import { PublicFooter } from '@/components/layout/PublicFooter';
-import {
-  Hero,
-  ForDoctors,
-  ForPatients,
-  ForCoordinators,
-  FeatureShowcase,
-  Trust,
-  CTA,
-} from './(public)/components/sections';
+import AlphaCarePage from './(public)/components/AlphaCarePage';
 
 export const metadata: Metadata = {
-  title: 'MedMitra - Modern Healthcare EMR Solutions',
+  title: 'MedMitra - Your Personal Health Records, Simplified & Secure',
   description:
-    'Transform your healthcare practice with AI-powered EMR solutions. Streamline workflows, enhance patient care, and unlock data-driven insights. HIPAA compliant, trusted by 10,000+ providers.',
+    'Get the right diagnosis from the world\'s top doctors. Access your health information anytime, anywhere with our secure platform. HIPAA compliant, trusted by 5000+ patients.',
   keywords: [
     'EMR',
     'EHR',
@@ -24,39 +14,29 @@ export const metadata: Metadata = {
     'practice management',
     'telemedicine',
     'HIPAA compliant',
+    'health records',
+    'patient portal',
+    'doctor appointment',
   ],
   openGraph: {
-    title: 'MedMitra - Modern Healthcare EMR Solutions',
+    title: 'MedMitra - Your Personal Health Records, Simplified & Secure',
     description:
-      'Transform your healthcare practice with AI-powered EMR solutions.',
+      'Get the right diagnosis from the world\'s top doctors. Access your health information anytime, anywhere.',
     type: 'website',
     url: 'https://medmitra.com',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MedMitra - Modern Healthcare EMR Solutions',
+    title: 'MedMitra - Your Personal Health Records, Simplified & Secure',
     description:
-      'Transform your healthcare practice with AI-powered EMR solutions.',
+      'Get the right diagnosis from the world\'s top doctors. Access your health information anytime, anywhere.',
   },
 };
 
 /**
  * Landing Page - Main public homepage
+ * Redesigned to match Alpha Care reference design
  */
 export default function Home() {
-  return (
-    <div className="relative min-h-screen">
-      <PublicNav />
-      <main className="relative">
-        <Hero />
-        <ForDoctors />
-        <ForPatients />
-        <ForCoordinators />
-        <FeatureShowcase />
-        <Trust />
-        <CTA />
-      </main>
-      <PublicFooter />
-    </div>
-  );
+  return <AlphaCarePage />;
 }
