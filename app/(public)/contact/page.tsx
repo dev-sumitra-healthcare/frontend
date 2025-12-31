@@ -5,7 +5,7 @@ import { AlphaCareHeader, AlphaCareFooter } from '@/components/shared';
 
 /**
  * Contact Page - Exact Figma Design Match (node 130-1847)
- * Two-column layout: Map + Contact Info | Appointment Form
+ * Two-column layout: Map + Contact Info | Appointment Form---
  */
 export default function ContactPage() {
   const [formData, setFormData] = useState({
