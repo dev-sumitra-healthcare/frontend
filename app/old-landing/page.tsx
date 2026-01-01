@@ -8,7 +8,7 @@ import {
   FeatureShowcase,
   Trust,
   CTA,
-} from './components/sections';
+} from '../(public)/components/sections';
 
 export const metadata: Metadata = {
   title: 'MedMitra - Modern Healthcare EMR Solutions',
