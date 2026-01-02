@@ -2,10 +2,18 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Eye, Check, X, Plus, Loader2 } from "lucide-react";
+import { ArrowLeft, Eye, Check, X, Plus, Loader2, Sparkles, Send } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { getEncounterDetails, finalizeEncounter, FinalizeEncounterRequest, getDoctorProfile } from "@/lib/api";
+import { 
+  getEncounterDetails, 
+  finalizeEncounter, 
+  FinalizeEncounterRequest, 
+  getDoctorProfile,
+  invokeAlfaEncounter,
+  invokeAlfaChat,
+  AlfaRecommendations
+} from "@/lib/api";
 import dynamic from "next/dynamic";
 import { PrescriptionPDF } from "@/components/prescriptions/PrescriptionPDF";
 
@@ -74,6 +82,16 @@ export default function EncounterPage() {
     duration: "",
     frequency: "",
   });
+
+  // Alfa AI State
+  const [isAlfaLoading, setIsAlfaLoading] = useState(false);
+  const [alfaSummary, setAlfaSummary] = useState<string | null>(null);
+  const [alfaRecommendations, setAlfaRecommendations] = useState<AlfaRecommendations | null>(null);
+  const [alfaEncId, setAlfaEncId] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [isAiPanelExpanded, setIsAiPanelExpanded] = useState(false); // AI panels collapsed initially
 
   // Load encounter data
   useEffect(() => {
@@ -241,6 +259,120 @@ export default function EncounterPage() {
     setShowPreview(true);
   };
 
+  // Alfa AI - Invoke Encounter Assessment
+  const handleAlfaInvoke = async () => {
+    if (!chiefComplaint.trim()) {
+      toast.error("Please enter a chief complaint first.");
+      return;
+    }
+    if (!id) {
+      toast.error("Missing encounter ID");
+      return;
+    }
+
+    setIsAlfaLoading(true);
+    try {
+      const patient = bundle?.patient || {};
+      const patientAge = patient.dateOfBirth || patient.date_of_birth
+        ? Math.max(0, Math.floor((Date.now() - new Date(patient.dateOfBirth || patient.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)))
+        : 20;
+
+      const complaintText = `Patient: ${patientAge}yo ${patient.gender || 'unknown'}. Chief Complaint: ${chiefComplaint}. ${symptoms.length > 0 ? `Symptoms: ${symptoms.join(', ')}.` : ''}`;
+      
+      const response = await invokeAlfaEncounter({
+        user_id: patient.id || patient.uhid || 'unknown',
+        enc_id: id,
+        complaint: complaintText,
+        vitals: {
+          bp: vitals.bloodPressure || null,
+          hr: vitals.heartRate || null,
+          temp: vitals.temperature || null,
+          weight: vitals.weight || null,
+          height: vitals.height || null,
+          spo2: vitals.spO2 || null,
+        },
+      });
+
+      if (response.data) {
+        const data = response.data;
+        setAlfaEncId(data.enc_id);
+        setAlfaSummary(data.summary || data.diagnosis);
+        setAlfaRecommendations(data.recommendations);
+
+        // Prefill Diagnosis
+        if (data.diagnosis) {
+          setDiagnoses([data.diagnosis]);
+        }
+        
+        // Prefill Medications
+        if (data.medications?.length) {
+          setMedications(data.medications.map((m, i) => ({
+            id: `alfa-${i}-${Date.now()}`,
+            name: m.name,
+            dosage: m.dosage || '',
+            frequency: m.frequency || '',
+            duration: m.duration || ''
+          })));
+        }
+        
+        // Prefill Investigations/Tests
+        if (data.tests?.length) {
+          setInvestigations(data.tests.map(t => `${t.name}${t.reason ? ` - ${t.reason}` : ''}`).join('\n'));
+        }
+        
+        // Prefill Additional Notes from recommendations
+        const recommendations = [];
+        if (data.recommendations?.lifestyle?.length) {
+          recommendations.push(`Lifestyle: ${data.recommendations.lifestyle.join(', ')}`);
+        }
+        if (data.recommendations?.diet?.length) {
+          recommendations.push(`Diet: ${data.recommendations.diet.join(', ')}`);
+        }
+        if (data.recommendations?.exercises?.length) {
+          recommendations.push(`Exercises: ${data.recommendations.exercises.join(', ')}`);
+        }
+        if (recommendations.length) {
+          setAdditionalNotes(recommendations.join('\n'));
+        }
+
+        // Expand AI panels after successful invocation
+        setIsAiPanelExpanded(true);
+
+        toast.success("AI suggestions applied to form!");
+      }
+    } catch (err: unknown) {
+      console.error("Alfa Invoke error:", err);
+      toast.error("Failed to get AI suggestions. Please try again.");
+    } finally {
+      setIsAlfaLoading(false);
+    }
+  };
+
+  // Alfa AI - Chat Handler
+  const handleSendChat = async () => {
+    if (!chatInput.trim()) return;
+    if (!alfaEncId) {
+      toast.error("Please invoke Alfa AI first to start a chat session.");
+      return;
+    }
+
+    const userMessage = chatInput.trim();
+    setChatMessages(prev => [...prev, { role: 'user', text: userMessage }]);
+    setChatInput('');
+    setIsChatLoading(true);
+
+    try {
+      const resp = await invokeAlfaChat(alfaEncId, { user_query: userMessage });
+      setChatMessages(prev => [...prev, { role: 'ai', text: resp.data.answer }]);
+    } catch (err) {
+      console.error("Chat error:", err);
+      toast.error("Chat failed. Please try again.");
+      setChatMessages(prev => [...prev, { role: 'ai', text: "Sorry, I couldn't process your request. Please try again." }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -337,7 +469,7 @@ export default function EncounterPage() {
         </div>
 
         {/* Middle Column - Form Sections */}
-        <div className="col-span-6 space-y-4">
+        <div className={`${isAiPanelExpanded || isAlfaLoading ? 'col-span-6' : 'col-span-10'} space-y-4`}>
           {/* Vitals */}
           <div className="bg-white rounded-xl p-4 shadow-sm">
             <h3 className="font-semibold text-gray-900 mb-3">Vitals</h3>
@@ -387,20 +519,31 @@ export default function EncounterPage() {
             </div>
           </div>
 
-          {/* Chief Complaint */}
+          {/* Chief Complaint & Symptoms (Combined) */}
           <div className="bg-white rounded-xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900">Chief Complaint & Symptoms</h3>
+              <button
+                onClick={handleAlfaInvoke}
+                disabled={isAlfaLoading || !chiefComplaint.trim()}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isAlfaLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                {isAlfaLoading ? "Analyzing..." : "Alfa Invoke"}
+              </button>
+            </div>
             <textarea
               value={chiefComplaint}
               onChange={(e) => setChiefComplaint(e.target.value)}
-              placeholder="Enter chief complaint..."
-              className="w-full h-24 p-3 border border-gray-200 rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              placeholder="Enter chief complaint and describe patient presentation..."
+              className="w-full h-24 p-3 border border-gray-200 rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 mb-3"
             />
-            <p className="text-sm font-medium text-gray-700 mt-2">Chief Complaint</p>
-          </div>
-
-          {/* Symptoms */}
-          <div className="bg-white rounded-xl p-4 shadow-sm">
-            <h3 className="font-semibold text-gray-900 mb-3">Symptoms</h3>
+            
+            {/* Symptoms Input */}
             <div className="flex gap-2 mb-3">
               <input
                 type="text"
@@ -608,39 +751,141 @@ export default function EncounterPage() {
           </div>
         </div>
 
-        {/* Right Column - AI Summary & Chat */}
-        <div className="col-span-4 space-y-4">
-          {/* AI Summary */}
-          <div className="bg-[#e8f0fc] rounded-xl p-4 shadow-sm min-h-[280px]">
-            <h3 className="font-semibold text-gray-900 mb-3">AI Summary Of The Suggestions</h3>
-            <div className="text-sm text-gray-600">
-              {bundle.aiAnalysis ? (
-                <div className="space-y-2">
-                  {bundle.aiAnalysis.summary && <p>{bundle.aiAnalysis.summary}</p>}
-                  {bundle.aiAnalysis.suggestions && (
-                    <ul className="list-disc pl-4 space-y-1">
-                      {bundle.aiAnalysis.suggestions.map((s: string, i: number) => (
-                        <li key={i}>{s}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ) : (
-                <p className="text-gray-400 italic">
-                  AI suggestions will appear here based on the entered symptoms and diagnosis...
-                </p>
-              )}
+        {/* Right Column - AI Summary & Chat (Only visible after Alfa Invoke) */}
+        {(isAiPanelExpanded || isAlfaLoading) && (
+          <div className="col-span-4 space-y-4">
+            {/* AI Summary - Expanded */}
+            <div className="bg-gradient-to-br from-[#e8f0fc] to-[#f0e8fc] rounded-xl p-4 shadow-sm min-h-[280px] transition-all duration-300">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="w-5 h-5 text-purple-600" />
+                <h3 className="font-semibold text-gray-900">AI Summary Of The Suggestions</h3>
+              </div>
+              <div className="text-sm text-gray-600">
+                {isAlfaLoading ? (
+                  <div className="flex items-center gap-2 text-purple-600">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Analyzing patient data...</span>
+                  </div>
+                ) : alfaSummary ? (
+                  <div className="space-y-3">
+                    <div className="p-3 bg-white/60 rounded-lg">
+                      <p className="font-medium text-gray-800 mb-1">Diagnosis</p>
+                      <p>{alfaSummary}</p>
+                    </div>
+                    {alfaRecommendations && (
+                      <div className="space-y-2">
+                        {alfaRecommendations.lifestyle?.length > 0 && (
+                          <div className="p-2 bg-green-50 rounded-lg">
+                            <p className="font-medium text-green-800 text-xs mb-1">Lifestyle</p>
+                            <ul className="text-xs space-y-0.5">
+                              {alfaRecommendations.lifestyle.map((r, i) => (
+                                <li key={i}>• {r}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {alfaRecommendations.diet?.length > 0 && (
+                          <div className="p-2 bg-orange-50 rounded-lg">
+                            <p className="font-medium text-orange-800 text-xs mb-1">Diet</p>
+                            <ul className="text-xs space-y-0.5">
+                              {alfaRecommendations.diet.map((r, i) => (
+                                <li key={i}>• {r}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {alfaRecommendations.exercises?.length > 0 && (
+                          <div className="p-2 bg-blue-50 rounded-lg">
+                            <p className="font-medium text-blue-800 text-xs mb-1">Exercises</p>
+                            <ul className="text-xs space-y-0.5">
+                              {alfaRecommendations.exercises.map((r, i) => (
+                                <li key={i}>• {r}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : bundle?.aiAnalysis ? (
+                  <div className="space-y-2">
+                    {bundle.aiAnalysis.summary && <p>{bundle.aiAnalysis.summary}</p>}
+                    {bundle.aiAnalysis.suggestions && (
+                      <ul className="list-disc pl-4 space-y-1">
+                        {bundle.aiAnalysis.suggestions.map((s: string, i: number) => (
+                          <li key={i}>{s}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-gray-400 italic">
+                    AI analysis complete. Results displayed above.
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Chat Window */}
-          <div className="bg-white rounded-xl p-4 shadow-sm">
-            <h3 className="font-semibold text-gray-900 mb-3">Chat Window</h3>
-            <div className="h-32 flex items-center justify-center text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">
-              Chat Window
+            {/* Chat Window - Expanded */}
+            <div className="bg-white rounded-xl p-4 shadow-sm flex flex-col transition-all duration-300" style={{ minHeight: '300px' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <Send className="w-4 h-4 text-blue-600" />
+                <h3 className="font-semibold text-gray-900">Chat with Alfa AI</h3>
+              </div>
+              
+              {/* Chat Messages */}
+              <div className="flex-1 overflow-y-auto space-y-2 mb-3 max-h-48">
+                {chatMessages.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+                    <span>Ask follow-up questions about the diagnosis...</span>
+                  </div>
+                ) : (
+                  chatMessages.map((msg, index) => (
+                    <div
+                      key={index}
+                      className={`p-2 rounded-lg text-sm ${
+                        msg.role === 'user'
+                          ? 'bg-blue-100 text-blue-900 ml-4'
+                          : 'bg-gray-100 text-gray-800 mr-4'
+                      }`}
+                    >
+                      <span className="font-medium text-xs block mb-0.5">
+                        {msg.role === 'user' ? 'You' : 'Alfa AI'}
+                      </span>
+                      {msg.text}
+                    </div>
+                  ))
+                )}
+                {isChatLoading && (
+                  <div className="flex items-center gap-2 text-gray-500 text-sm p-2">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Thinking...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Chat Input */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendChat()}
+                  placeholder="Ask a follow-up question..."
+                  disabled={!alfaEncId || isChatLoading}
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                />
+                <button
+                  onClick={handleSendChat}
+                  disabled={!alfaEncId || isChatLoading || !chatInput.trim()}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Prescription Preview Modal */}

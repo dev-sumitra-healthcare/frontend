@@ -2332,3 +2332,105 @@ export const getDoctorAvailability = async (doctorId: string, hospitalId: string
 export const bookPatientAppointment = async (data: { doctorId: string; hospitalId: string; scheduledTime: string; appointmentType?: string }): Promise<AxiosResponse<{ status: string; message: string; data: BookingConfirmation }>> => {
   return apiClient.post('/patients/appointments', data);
 };
+
+// ============================================
+// ALFA AI MICROSERVICE API
+// Healthcare RAG System for encounter assessments
+// ============================================
+
+const ALFA_AI_BASE_URL = process.env.NEXT_PUBLIC_ALFA_AI_URL || "http://13.233.190.222:8000";
+
+const alfaApiClient = axios.create({
+  baseURL: ALFA_AI_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// --- Alfa AI Types ---
+
+export interface AlfaEncounterRequest {
+  user_id: string;
+  enc_id: string;
+  complaint: string;
+  vitals?: Record<string, string | number | null>;
+}
+
+export interface AlfaMedication {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  notes?: string;
+  optional?: boolean;
+}
+
+export interface AlfaTest {
+  name: string;
+  reason?: string;
+  urgency?: string;
+  optional?: boolean;
+}
+
+export interface AlfaRecommendations {
+  lifestyle: string[];
+  diet: string[];
+  exercises: string[];
+}
+
+export interface AlfaEncounterResponse {
+  enc_id: string;
+  diagnosis: string;
+  medications: AlfaMedication[];
+  tests: AlfaTest[];
+  recommendations: AlfaRecommendations;
+  summary: string;
+  metadata: {
+    confidence_score: number;
+    retrieval_sources: string[];
+  };
+  sources: Record<string, unknown>[];
+}
+
+export interface AlfaChatRequest {
+  user_query: string;
+}
+
+export interface AlfaChatResponse {
+  answer: string;
+  metadata: {
+    confidence_score: number;
+    retrieval_sources: string[];
+  };
+  sources: Record<string, unknown>[];
+}
+
+// --- Alfa AI API Functions ---
+
+/**
+ * Invoke Alfa AI for a new encounter assessment.
+ * Returns diagnosis, medications, tests, and recommendations.
+ */
+export const invokeAlfaEncounter = async (
+  data: AlfaEncounterRequest
+): Promise<AxiosResponse<AlfaEncounterResponse>> => {
+  return alfaApiClient.post("/query", data);
+};
+
+/**
+ * Chat within an existing Alfa AI encounter.
+ * For follow-up questions after initial assessment.
+ */
+export const invokeAlfaChat = async (
+  encId: string,
+  data: AlfaChatRequest
+): Promise<AxiosResponse<AlfaChatResponse>> => {
+  return alfaApiClient.post(`/${encId}/query`, data);
+};
+
+/**
+ * Health check for Alfa AI microservice.
+ */
+export const checkAlfaHealth = async (): Promise<AxiosResponse<unknown>> => {
+  return alfaApiClient.get("/health");
+};
