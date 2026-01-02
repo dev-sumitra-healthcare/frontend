@@ -9,7 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { getDoctorDashboard, DashboardQueueItem } from "@/lib/api";
+import {
+  getDoctorDashboard,
+  DashboardQueueItem,
+  getEncounterDetails,
+  finalizeEncounter,
+  FinalizeEncounterRequest
+} from "@/lib/api";
 import { toast } from "sonner";
 
 export default function ConsultationPage() {
@@ -29,6 +35,8 @@ export default function ConsultationPage() {
   const [treatmentPlan, setTreatmentPlan] = useState("");
   const [medications, setMedications] = useState("");
 
+  const [encounterId, setEncounterId] = useState<string | null>(null);
+
   useEffect(() => {
     loadAppointmentData();
   }, [appointmentId]);
@@ -45,10 +53,32 @@ export default function ConsultationPage() {
         if (foundAppointment) {
           setAppointment(foundAppointment);
 
+          
+          // Get encounter details (creates one if not exists)
+          try {
+            const encResponse = await getEncounterDetails(appointmentId);
+            if (encResponse.data.success) {
+              setEncounterId(encResponse.data.data.bundle.encounter.id);
+            }
+          } catch (err) {
+            console.error("Error loading encounter details:", err);
+          }
+
           // Check for triage vitals
           if (foundAppointment.vitals && foundAppointment.triageRecordedAt) {
             setVitalsMode("prefilled");
-            setVitalsData(foundAppointment.vitals as VitalsData);
+            // Map TriageVitals (api.ts) to VitalsData (VitalsForm.tsx)
+            // Triage: pulse, temp, bp
+            // Form: heartRate, temperature, bp
+            const triage = foundAppointment.vitals as any;
+            const formVitals: VitalsData = {
+              bp: triage.bp,
+              heartRate: triage.pulse,
+              temperature: triage.temp,
+              weight: triage.weight,
+              height: triage.height
+            };
+            setVitalsData(formVitals);
           } else {
             setVitalsMode("manual");
           }
@@ -78,24 +108,54 @@ export default function ConsultationPage() {
   };
 
   const handleFinalizeEncounter = async () => {
-    try {
-      // TODO: Implement encounter finalization with API call
-      // const encounterData = {
-      //   vitals: vitalsData,
-      //   chiefComplaint,
-      //   historyPresentIllness,
-      //   diagnosis,
-      //   treatmentPlan,
-      //   medications,
-      // };
-      // await finalizeEncounter(encounterId, encounterData);
+    if (!encounterId) {
+      toast.error("Encounter ID not found. Please refresh.");
+      return;
+    }
 
+    try {
+      const loadingToast = toast.loading("Finalizing encounter...");
+
+      // Construct payload
+      const payload: FinalizeEncounterRequest = {
+        appointmentId,
+        chiefComplaint,
+        presentingSymptoms: [], // TODO: extract from text or add UI
+        diagnosis: diagnosis ? [{ code: "manual", description: diagnosis, confidence: "high" }] : [],
+        medications: medications ? [{ 
+          name: medications, 
+          dosage: "", 
+          frequency: "", 
+          duration: "", 
+          instructions: treatmentPlan 
+        }] : [],
+        vitalSigns: vitalsData ? {
+          bloodPressure: vitalsData.bp || "",
+          heartRate: vitalsData.heartRate?.toString() || "",
+          temperature: vitalsData.temperature?.toString() || "",
+          respiratoryRate: "", 
+          oxygenSaturation: "", // VitalsForm doesn't capture SpO2 currently
+        } : {
+          bloodPressure: "",
+          heartRate: "",
+          temperature: "",
+          respiratoryRate: "",
+          oxygenSaturation: "",
+        },
+        doctorRemarks: historyPresentIllness, // Mapping HPI to comments/remarks for now
+        followUpInstructions: treatmentPlan,
+      };
+
+      await finalizeEncounter(encounterId, payload);
+
+      toast.dismiss(loadingToast);
       toast.success("Encounter finalized", {
         description: "Returning to queue",
       });
       router.push("/doctor/opd");
     } catch (error: any) {
       console.error("Error finalizing encounter:", error);
+      toast.dismiss();
       toast.error("Failed to finalize encounter", {
         description: error.response?.data?.message || "Please try again",
       });
