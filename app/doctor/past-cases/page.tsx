@@ -157,9 +157,20 @@ export default function PastCasesPage() {
 
 
   // Extract diagnosis names from the diagnosis array
+  // Handles cases where diagnosis might be the AI summary text by truncating
   const getDiagnosisNames = (diagnosis: EncounterSearchResult["diagnosis"]): string[] => {
     if (!diagnosis || !Array.isArray(diagnosis)) return [];
-    return diagnosis.map(d => d.description || "Unknown").slice(0, 3);
+    return diagnosis
+      .map(d => {
+        // Prefer 'name' field, fallback to 'description', then 'code'
+        const text = d.name || d.description || d.code || "Unknown";
+        // Truncate long text (e.g., AI summaries accidentally stored here)
+        if (text.length > 40) {
+          return text.substring(0, 37) + "...";
+        }
+        return text;
+      })
+      .slice(0, 2); // Show max 2 diagnoses
   };
 
   // Get symptoms to display (max 3)

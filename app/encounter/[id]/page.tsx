@@ -132,6 +132,9 @@ export default function EncounterPage() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isAiPanelExpanded, setIsAiPanelExpanded] = useState(false); // AI panels collapsed initially
 
+  // Section ordering from doctor preferences
+  const [sectionOrder, setSectionOrder] = useState<string[]>(['vitals', 'symptoms', 'diagnosis', 'medications', 'notes']);
+
   // Load encounter data and vitals config
   useEffect(() => {
     const fetchData = async () => {
@@ -147,7 +150,7 @@ export default function EncounterPage() {
           getDoctorVitalsConfig().catch(() => null)
         ]);
         
-        // Set doctor info
+        // Set doctor info and section order
         if (doctorResp?.data?.success) {
           const doc = doctorResp.data.data?.doctor || doctorResp.data.data;
           setDoctorInfo({
@@ -155,6 +158,11 @@ export default function EncounterPage() {
             qualification: doc?.qualification || doc?.qualifications,
             registration: doc?.registrationNumber || doc?.registration_number || doc?.medicalRegistrationId
           });
+          
+          // Apply saved encounter form section order
+          if (doc?.ui_preferences?.encounterFormOrder?.length) {
+            setSectionOrder(doc.ui_preferences.encounterFormOrder);
+          }
         }
         
         // Set vitals configuration
@@ -546,6 +554,177 @@ export default function EncounterPage() {
     );
   }
 
+  // Section renderer for dynamic ordering
+  const renderSection = (sectionId: string) => {
+    switch (sectionId) {
+      case 'vitals':
+        return (
+          <div key="vitals" className="bg-white rounded-xl p-4 shadow-sm">
+            <h3 className="font-semibold text-gray-900 mb-3">Vitals</h3>
+            {enabledVitals.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                {enabledVitals.map((vital) => {
+                  const IconComponent = iconMap[vital.icon || 'activity'] || Activity;
+                  return (
+                    <div key={vital.key} className="flex items-center gap-2">
+                      <IconComponent className={`w-4 h-4 ${vital.color || 'text-gray-400'}`} />
+                      <input
+                        type="text"
+                        value={vitals[vital.key] || ''}
+                        onChange={(e) => setVitals({ ...vitals, [vital.key]: e.target.value })}
+                        placeholder={vital.name}
+                        disabled={isFinalized}
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-100"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <input type="text" value={vitals.bp || ''} onChange={(e) => setVitals({ ...vitals, bp: e.target.value })} placeholder="Blood Pressure" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                <input type="text" value={vitals.pulse || ''} onChange={(e) => setVitals({ ...vitals, pulse: e.target.value })} placeholder="Heart Rate" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                <input type="text" value={vitals.temp || ''} onChange={(e) => setVitals({ ...vitals, temp: e.target.value })} placeholder="Temperature" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                <input type="text" value={vitals.weight || ''} onChange={(e) => setVitals({ ...vitals, weight: e.target.value })} placeholder="Weight" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+              </div>
+            )}
+          </div>
+        );
+      case 'symptoms':
+        return (
+          <div key="symptoms" className="bg-white rounded-xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900">Chief Complaint & Symptoms</h3>
+              <button
+                onClick={handleAlfaInvoke}
+                disabled={isAlfaLoading || !chiefComplaint.trim() || isFinalized}
+                className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isAlfaLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Alfa Invoke
+              </button>
+            </div>
+            <textarea
+              value={chiefComplaint}
+              onChange={(e) => setChiefComplaint(e.target.value)}
+              placeholder="Describe the chief complaint..."
+              disabled={isFinalized}
+              className="w-full h-20 p-3 border border-gray-200 rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-100 mb-3"
+            />
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                value={symptomInput}
+                onChange={(e) => setSymptomInput(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && addSymptom()}
+                placeholder="Add symptom..."
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+              <button onClick={addSymptom} className="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors text-sm font-medium">Add</button>
+            </div>
+            {symptoms.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {symptoms.map((s, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 px-3 py-1 bg-cyan-50 text-cyan-700 rounded-full text-sm">
+                    {s}
+                    <button onClick={() => removeSymptom(i)} className="hover:text-cyan-900"><X className="w-3 h-3" /></button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      case 'diagnosis':
+        return (
+          <div key="diagnosis" className="bg-white rounded-xl p-4 shadow-sm">
+            <h3 className="font-semibold text-gray-900 mb-3">Diagnosis</h3>
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                value={diagnosisInput}
+                onChange={(e) => setDiagnosisInput(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && addDiagnosis()}
+                placeholder="Add diagnosis..."
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+              <button onClick={addDiagnosis} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">Add</button>
+            </div>
+            {diagnoses.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {diagnoses.map((d, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 px-3 py-1 bg-red-50 text-red-700 rounded-full text-sm">
+                    {d}
+                    <button onClick={() => removeDiagnosis(i)} className="hover:text-red-900"><X className="w-3 h-3" /></button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      case 'medications':
+        return (
+          <div key="medications" className="bg-white rounded-xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900">Medications</h3>
+              <button onClick={() => setShowMedForm(true)} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium">Add Medication</button>
+            </div>
+            {showMedForm && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="text" value={medForm.name} onChange={(e) => setMedForm({ ...medForm, name: e.target.value })} placeholder="Medicine name" className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                  <input type="text" value={medForm.dosage} onChange={(e) => setMedForm({ ...medForm, dosage: e.target.value })} placeholder="Dosage" className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                  <input type="text" value={medForm.duration} onChange={(e) => setMedForm({ ...medForm, duration: e.target.value })} placeholder="Duration" className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                  <input type="text" value={medForm.frequency} onChange={(e) => setMedForm({ ...medForm, frequency: e.target.value })} placeholder="Frequency" className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={addMedication} className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">Save</button>
+                  <button onClick={() => setShowMedForm(false)} className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300">Cancel</button>
+                </div>
+              </div>
+            )}
+            {medications.length > 0 && (
+              <div className="space-y-2">
+                {medications.map((med) => (
+                  <div key={med.id} className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                    <div>
+                      <span className="font-medium text-purple-900">{med.name}</span>
+                      <span className="text-sm text-purple-600 ml-2">{med.dosage} • {med.frequency} • {med.duration}</span>
+                    </div>
+                    <button onClick={() => removeMedication(med.id)} className="text-purple-400 hover:text-purple-600"><X className="w-4 h-4" /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      case 'notes':
+        return (
+          <React.Fragment key="notes">
+            <div className="bg-white rounded-xl p-4 shadow-sm">
+              <h3 className="font-semibold text-gray-900 mb-3">Investigations</h3>
+              <textarea
+                value={investigations}
+                onChange={(e) => setInvestigations(e.target.value)}
+                placeholder="List investigations to be done..."
+                className="w-full h-20 p-3 border border-gray-200 rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm">
+              <h3 className="font-semibold text-gray-900 mb-3">Additional Notes</h3>
+              <textarea
+                value={additionalNotes}
+                onChange={(e) => setAdditionalNotes(e.target.value)}
+                placeholder="Add any additional notes..."
+                className="w-full h-20 p-3 border border-gray-200 rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+            </div>
+          </React.Fragment>
+        );
+      default:
+        return null;
+    }
+  };
+
   const patient = bundle.patient || {};
   const patientAge = patient.dateOfBirth || patient.date_of_birth
     ? Math.max(0, Math.floor((Date.now() - new Date(patient.dateOfBirth || patient.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)))
@@ -653,259 +832,8 @@ export default function EncounterPage() {
 
         {/* Middle Column - Form Sections */}
         <div className={`${isAiPanelExpanded || isAlfaLoading ? 'col-span-6' : 'col-span-10'} space-y-4`}>
-          {/* Vitals */}
-          <div className="bg-white rounded-xl p-4 shadow-sm">
-            <h3 className="font-semibold text-gray-900 mb-3">Vitals</h3>
-            {enabledVitals.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3">
-                {enabledVitals.map((vital) => {
-                  const IconComponent = iconMap[vital.icon || 'activity'] || Activity;
-                  return (
-                    <div key={vital.key} className="flex items-center gap-2">
-                      <IconComponent className={`w-4 h-4 ${vital.color || 'text-gray-400'}`} />
-                      <input
-                        type={vital.input_type === 'text' ? 'text' : 'text'}
-                        value={vitals[vital.key] || ''}
-                        onChange={(e) => setVitals({ ...vitals, [vital.key]: e.target.value })}
-                        placeholder={vital.name}
-                        disabled={isFinalized}
-                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-100"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <input type="text" value={vitals.bp || ''} onChange={(e) => setVitals({ ...vitals, bp: e.target.value })} placeholder="Blood Pressure" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-100" />
-                <input type="text" value={vitals.pulse || ''} onChange={(e) => setVitals({ ...vitals, pulse: e.target.value })} placeholder="Heart Rate" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-                <input type="text" value={vitals.temp || ''} onChange={(e) => setVitals({ ...vitals, temp: e.target.value })} placeholder="Temperature" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-                <input type="text" value={vitals.weight || ''} onChange={(e) => setVitals({ ...vitals, weight: e.target.value })} placeholder="Weight" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-                <input type="text" value={vitals.height || ''} onChange={(e) => setVitals({ ...vitals, height: e.target.value })} placeholder="Height" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-                <input type="text" value={vitals.spo2 || ''} onChange={(e) => setVitals({ ...vitals, spo2: e.target.value })} placeholder="SpO2" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-              </div>
-            )}
-          </div>
-
-          {/* Chief Complaint & Symptoms (Combined) */}
-          <div className="bg-white rounded-xl p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-900">Chief Complaint & Symptoms</h3>
-              <button
-                onClick={handleAlfaInvoke}
-                disabled={isFinalized || isAlfaLoading || !chiefComplaint.trim()}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isAlfaLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
-                {isAlfaLoading ? "Analyzing..." : "Alfa Invoke"}
-              </button>
-            </div>
-            <textarea
-              value={chiefComplaint}
-              onChange={(e) => setChiefComplaint(e.target.value)}
-              placeholder="Enter chief complaint and describe patient presentation..."
-              disabled={isFinalized}
-              className="w-full h-24 p-3 border border-gray-200 rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 mb-3 disabled:bg-gray-100"
-            />
-            
-            {/* Symptoms Input */}
-            <div className="flex gap-2 mb-3">
-              <input
-                type="text"
-                value={symptomInput}
-                onChange={(e) => setSymptomInput(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && addSymptom()}
-                placeholder="Add symptom..."
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-              <button
-                onClick={addSymptom}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-              >
-                Add
-              </button>
-            </div>
-            {symptoms.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {symptoms.map((symptom, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
-                  >
-                    {symptom}
-                    <button onClick={() => removeSymptom(index)} className="hover:text-blue-900">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Diagnosis */}
-          <div className="bg-white rounded-xl p-4 shadow-sm">
-            <h3 className="font-semibold text-gray-900 mb-3">Diagnosis</h3>
-            <div className="flex gap-2 mb-3">
-              <input
-                type="text"
-                value={diagnosisInput}
-                onChange={(e) => setDiagnosisInput(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && addDiagnosis()}
-                placeholder="Add diagnosis..."
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-              <button
-                onClick={addDiagnosis}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
-              >
-                Add
-              </button>
-            </div>
-            {diagnoses.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {diagnoses.map((diagnosis, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center gap-1 px-3 py-1 bg-red-50 text-red-700 rounded-full text-sm"
-                  >
-                    {diagnosis}
-                    <button onClick={() => removeDiagnosis(index)} className="hover:text-red-900">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Medications */}
-          <div className="bg-white rounded-xl p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-900">Medications</h3>
-              <button
-                onClick={() => setShowMedForm(true)}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
-              >
-                Add Medication
-              </button>
-            </div>
-
-            {showMedForm && (
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="text"
-                    value={medForm.name}
-                    onChange={(e) => setMedForm({ ...medForm, name: e.target.value })}
-                    placeholder="Medicine name"
-                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                  />
-                  <input
-                    type="text"
-                    value={medForm.dosage}
-                    onChange={(e) => setMedForm({ ...medForm, dosage: e.target.value })}
-                    placeholder="Dosage"
-                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                  />
-                  <input
-                    type="text"
-                    value={medForm.duration}
-                    onChange={(e) => setMedForm({ ...medForm, duration: e.target.value })}
-                    placeholder="Duration"
-                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                  />
-                  <input
-                    type="text"
-                    value={medForm.frequency}
-                    onChange={(e) => setMedForm({ ...medForm, frequency: e.target.value })}
-                    placeholder="Frequency"
-                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={addMedication}
-                    className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => setShowMedForm(false)}
-                    className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {!showMedForm && medications.length === 0 && (
-              <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-400">
-                  Medicine name
-                </span>
-                <span className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-400">
-                  Dosage
-                </span>
-                <span className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-400">
-                  Duration
-                </span>
-                <span className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-400">
-                  Frequency
-                </span>
-              </div>
-            )}
-
-            {medications.length > 0 && (
-              <div className="space-y-2">
-                {medications.map((med) => (
-                  <div
-                    key={med.id}
-                    className="flex items-center justify-between p-2 bg-purple-50 rounded-lg"
-                  >
-                    <div className="flex gap-4 text-sm">
-                      <span className="font-medium text-purple-900">{med.name}</span>
-                      <span className="text-purple-700">{med.dosage}</span>
-                      <span className="text-purple-700">{med.duration}</span>
-                      <span className="text-purple-700">{med.frequency}</span>
-                    </div>
-                    <button
-                      onClick={() => removeMedication(med.id)}
-                      className="text-purple-600 hover:text-purple-800"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Investigations */}
-          <div className="bg-white rounded-xl p-4 shadow-sm">
-            <h3 className="font-semibold text-gray-900 mb-3">Investigations</h3>
-            <textarea
-              value={investigations}
-              onChange={(e) => setInvestigations(e.target.value)}
-              placeholder="List investigations to be done..."
-              className="w-full h-20 p-3 border border-gray-200 rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-            />
-          </div>
-
-          {/* Additional Notes */}
-          <div className="bg-white rounded-xl p-4 shadow-sm">
-            <h3 className="font-semibold text-gray-900 mb-3">Additional Notes</h3>
-            <textarea
-              value={additionalNotes}
-              onChange={(e) => setAdditionalNotes(e.target.value)}
-              placeholder="Add any additional notes..."
-              className="w-full h-20 p-3 border border-gray-200 rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-            />
-          </div>
+          {/* Dynamic sections based on saved order */}
+          {sectionOrder.map((sectionId) => renderSection(sectionId))}
 
 
           {/* Recommendations Sections */}

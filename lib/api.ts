@@ -976,7 +976,7 @@ export interface EncounterSearchResult {
   patientName: string;
   patientUhid: string;
   status: string;
-  diagnosis: Array<{ code?: string; description: string; confidence?: string }> | null;
+  diagnosis: Array<{ code?: string; name?: string; description: string; confidence?: string }> | null;
   chiefComplaint: string | null;
   symptoms: string[] | null;
   vitalSigns: Record<string, unknown> | null;
