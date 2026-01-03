@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Eye, Check, X, Plus, Loader2, Sparkles, Send } from "lucide-react";
 import Link from "next/link";
@@ -16,6 +16,7 @@ import {
 } from "@/lib/api";
 import dynamic from "next/dynamic";
 import { PrescriptionPDF } from "@/components/prescriptions/PrescriptionPDF";
+import EncounterPreview from "@/components/doctor/EncounterPreview";
 
 // Dynamically import PDFViewer to avoid SSR issues
 const PDFViewer = dynamic(
@@ -41,6 +42,24 @@ interface Vitals {
   spO2: string;
 }
 
+// Draft data structure for localStorage
+interface EncounterFormDraft {
+  healthHistory: string;
+  vitals: Vitals;
+  chiefComplaint: string;
+  symptoms: string[];
+  diagnoses: string[];
+  medications: Medication[];
+  investigations: string;
+  additionalNotes: string;
+  followUp: string;
+  savedAt: number; // timestamp
+}
+
+// Helper to get storage key for a specific encounter
+const getStorageKey = (encounterId: string) => `encounter_draft_${encounterId}`;
+
+
 export default function EncounterPage() {
   const params = useParams();
   const router = useRouter();
@@ -53,6 +72,9 @@ export default function EncounterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [doctorInfo, setDoctorInfo] = useState<{ name: string; qualification?: string; registration?: string } | null>(null);
+
+  // Derived state: Check if encounter is already finalized (read-only)
+  const isFinalized = bundle?.encounter?.status === 'completed' || bundle?.encounter?.status === 'finalized';
 
   // Form State
   const [healthHistory, setHealthHistory] = useState("");
@@ -162,6 +184,74 @@ export default function EncounterPage() {
     fetchData();
   }, [id, router]);
 
+  // localStorage: Load draft on mount (after API data is loaded)
+  useEffect(() => {
+    if (!id || loading || !bundle) return;
+    
+    try {
+      const storageKey = getStorageKey(id);
+      const savedDraft = localStorage.getItem(storageKey);
+      if (savedDraft) {
+        const draft: EncounterFormDraft = JSON.parse(savedDraft);
+        // Only restore if draft is reasonably recent (< 24h)
+        const isRecent = Date.now() - draft.savedAt < 24 * 60 * 60 * 1000;
+        if (isRecent) {
+          console.log("[EncounterPage] Restoring draft from localStorage");
+          if (draft.healthHistory) setHealthHistory(draft.healthHistory);
+          if (draft.vitals) setVitals(draft.vitals);
+          if (draft.chiefComplaint) setChiefComplaint(draft.chiefComplaint);
+          if (draft.symptoms?.length) setSymptoms(draft.symptoms);
+          if (draft.diagnoses?.length) setDiagnoses(draft.diagnoses);
+          if (draft.medications?.length) setMedications(draft.medications);
+          if (draft.investigations) setInvestigations(draft.investigations);
+          if (draft.additionalNotes) setAdditionalNotes(draft.additionalNotes);
+          if (draft.followUp) setFollowUp(draft.followUp);
+        }
+      }
+    } catch (err) {
+      console.error("[EncounterPage] Error loading draft:", err);
+    }
+  }, [id, loading, bundle]);
+
+  // localStorage: Save draft on form change (debounced)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  useEffect(() => {
+    if (!id || loading) return;
+    
+    // Clear previous timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Debounce save by 1 second
+    saveTimeoutRef.current = setTimeout(() => {
+      try {
+        const draft: EncounterFormDraft = {
+          healthHistory,
+          vitals,
+          chiefComplaint,
+          symptoms,
+          diagnoses,
+          medications,
+          investigations,
+          additionalNotes,
+          followUp,
+          savedAt: Date.now(),
+        };
+        localStorage.setItem(getStorageKey(id), JSON.stringify(draft));
+      } catch (err) {
+        console.error("[EncounterPage] Error saving draft:", err);
+      }
+    }, 1000);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [id, loading, healthHistory, vitals, chiefComplaint, symptoms, diagnoses, medications, investigations, additionalNotes, followUp]);
+
   // Handlers
   const addSymptom = () => {
     if (symptomInput.trim()) {
@@ -240,6 +330,12 @@ export default function EncounterPage() {
       };
 
       await finalizeEncounter(bundle.encounter.id, data);
+      
+      // Clear localStorage draft on successful submit
+      if (id) {
+        localStorage.removeItem(getStorageKey(id));
+      }
+      
       toast.success("Encounter submitted successfully!");
       router.push("/doctor/dashboard");
     } catch (error) {
@@ -435,25 +531,71 @@ export default function EncounterPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={handlePreview}
-            className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-          >
-            <Eye className="w-4 h-4" />
-            Preview
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            <Check className="w-4 h-4" />
-            {isSubmitting ? "Submitting..." : "Submit"}
-          </button>
+          {isFinalized ? (
+            <span className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
+              ✓ Encounter Finalized
+            </span>
+          ) : (
+            <>
+              {showPreview ? (
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Edit
+                </button>
+              ) : (
+                <button
+                  onClick={handlePreview}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                >
+                  <Eye className="w-4 h-4" />
+                  Preview
+                </button>
+              )}
+              
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                <Check className="w-4 h-4" />
+                {isSubmitting ? "Submitting..." : showPreview ? "Finalize Encounter" : "Submit"}
+              </button>
+            </>
+          )}
         </div>
       </header>
 
-      {/* Main Content - 3 Column Layout */}
+      {/* Main Content */}
+      {showPreview ? (
+        <div className="p-4 max-w-5xl mx-auto h-[calc(100vh-70px)] overflow-y-auto">
+          <EncounterPreview
+            patient={{
+              name: patient.fullName || patient.full_name || "Patient",
+              uhid: patient.uhid || "N/A",
+              age: patientAge,
+              gender: patient.gender
+            }}
+            vitals={{
+              bp: vitals.bloodPressure,
+              heartRate: vitals.heartRate,
+              temperature: vitals.temperature,
+              weight: vitals.weight,
+              height: vitals.height,
+              spO2: vitals.spO2
+            }}
+            clinicalNotes={{
+              chiefComplaint,
+              historyPresentIllness: healthHistory, // Using health history as HPI for now, or combine
+              diagnosis: diagnoses.join(", "),
+              treatmentPlan: additionalNotes // or followUp
+            }}
+            medications={medications}
+          />
+        </div>
+      ) : (
       <div className="p-4 grid grid-cols-12 gap-4 max-h-[calc(100vh-70px)] overflow-y-auto">
         {/* Left Column - Health History */}
         <div className="col-span-2">
@@ -463,7 +605,8 @@ export default function EncounterPage() {
               value={healthHistory}
               onChange={(e) => setHealthHistory(e.target.value)}
               placeholder="health history Summary..."
-              className="w-full h-48 p-3 border border-gray-200 rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              disabled={isFinalized}
+              className="w-full h-48 p-3 border border-gray-200 rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             />
           </div>
         </div>
@@ -479,7 +622,8 @@ export default function EncounterPage() {
                 value={vitals.bloodPressure}
                 onChange={(e) => setVitals({ ...vitals, bloodPressure: e.target.value })}
                 placeholder="Blood Pressure"
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                disabled={isFinalized}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-100"
               />
               <input
                 type="text"
@@ -525,7 +669,7 @@ export default function EncounterPage() {
               <h3 className="font-semibold text-gray-900">Chief Complaint & Symptoms</h3>
               <button
                 onClick={handleAlfaInvoke}
-                disabled={isAlfaLoading || !chiefComplaint.trim()}
+                disabled={isFinalized || isAlfaLoading || !chiefComplaint.trim()}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isAlfaLoading ? (
@@ -540,7 +684,8 @@ export default function EncounterPage() {
               value={chiefComplaint}
               onChange={(e) => setChiefComplaint(e.target.value)}
               placeholder="Enter chief complaint and describe patient presentation..."
-              className="w-full h-24 p-3 border border-gray-200 rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 mb-3"
+              disabled={isFinalized}
+              className="w-full h-24 p-3 border border-gray-200 rounded-lg resize-none text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 mb-3 disabled:bg-gray-100"
             />
             
             {/* Symptoms Input */}
@@ -887,61 +1032,10 @@ export default function EncounterPage() {
           </div>
         )}
       </div>
-
-      {/* Prescription Preview Modal */}
-      {showPreview && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-4xl w-full h-[90vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-xl font-semibold text-gray-900">Prescription Preview</h3>
-              <button
-                onClick={() => setShowPreview(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-
-            {/* PDF Preview */}
-            <div className="flex-1 overflow-hidden">
-              <PDFViewer style={{ width: '100%', height: '100%', border: 'none' }}>
-                <PrescriptionPDF
-                  patientName={patient.fullName || patient.full_name || patient.name || 'Patient'}
-                  patientAge={patientAge}
-                  patientGender={patient.gender || patient.demographics?.gender}
-                  patientUHID={patient.uhid}
-                  date={new Date().toISOString()}
-                  doctorName={doctorInfo?.name || 'Doctor'}
-                  doctorQualification={doctorInfo?.qualification}
-                  doctorRegistration={doctorInfo?.registration}
-                  medications={medications.map(m => ({
-                    name: m.name,
-                    dosage: m.dosage,
-                    frequency: m.frequency,
-                    duration: m.duration,
-                    instructions: ''
-                  }))}
-                  advice={additionalNotes}
-                  tests={investigations ? investigations.split('\n').filter(t => t.trim()).map(t => ({ name: t.trim(), instructions: '' })) : []}
-                  followUp={followUp}
-                  notes={chiefComplaint ? `Chief Complaint: ${chiefComplaint}` : ''}
-                />
-              </PDFViewer>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t flex justify-end gap-3">
-              <button
-                onClick={() => setShowPreview(false)}
-                className="px-6 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
       )}
+
+      {/* Prescription Preview Modal (Removed) */}
+
     </div>
   );
 }
