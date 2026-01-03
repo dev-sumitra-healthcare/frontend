@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Eye, Check, X, Plus, Loader2, Sparkles, Send } from "lucide-react";
+import { ArrowLeft, Eye, Check, X, Plus, Loader2, Sparkles, Send, Heart, Activity, Thermometer, Scale, Ruler, Wind, LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { 
@@ -12,7 +12,10 @@ import {
   getDoctorProfile,
   invokeAlfaEncounter,
   invokeAlfaChat,
-  AlfaRecommendations
+  AlfaRecommendations,
+  getVitalsDefinitions,
+  getDoctorVitalsConfig,
+  VitalDefinition
 } from "@/lib/api";
 import dynamic from "next/dynamic";
 import { PrescriptionPDF } from "@/components/prescriptions/PrescriptionPDF";
@@ -34,13 +37,18 @@ interface Medication {
 }
 
 interface Vitals {
-  bloodPressure: string;
-  heartRate: string;
-  temperature: string;
-  weight: string;
-  height: string;
-  spO2: string;
+  [key: string]: string;
 }
+
+// Icon mapping for vitals
+const iconMap: Record<string, LucideIcon> = {
+  heart: Heart,
+  activity: Activity,
+  thermometer: Thermometer,
+  scale: Scale,
+  ruler: Ruler,
+  wind: Wind,
+};
 
 // Draft data structure for localStorage
 interface EncounterFormDraft {
@@ -78,14 +86,8 @@ export default function EncounterPage() {
 
   // Form State
   const [healthHistory, setHealthHistory] = useState("");
-  const [vitals, setVitals] = useState<Vitals>({
-    bloodPressure: "",
-    heartRate: "",
-    temperature: "",
-    weight: "",
-    height: "",
-    spO2: "",
-  });
+  const [vitals, setVitals] = useState<Vitals>({});
+  const [enabledVitals, setEnabledVitals] = useState<VitalDefinition[]>([]);
   const [chiefComplaint, setChiefComplaint] = useState("");
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [symptomInput, setSymptomInput] = useState("");
@@ -115,7 +117,7 @@ export default function EncounterPage() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isAiPanelExpanded, setIsAiPanelExpanded] = useState(false); // AI panels collapsed initially
 
-  // Load encounter data
+  // Load encounter data and vitals config
   useEffect(() => {
     const fetchData = async () => {
       if (!id) return;
@@ -123,10 +125,11 @@ export default function EncounterPage() {
         setLoading(true);
         setError(null);
         
-        // Fetch encounter and doctor profile in parallel
-        const [resp, doctorResp] = await Promise.all([
+        // Fetch encounter, doctor profile, and vitals config in parallel
+        const [resp, doctorResp, vitalsConfigResp] = await Promise.all([
           getEncounterDetails(id),
-          getDoctorProfile().catch(() => null)
+          getDoctorProfile().catch(() => null),
+          getDoctorVitalsConfig().catch(() => null)
         ]);
         
         // Set doctor info
@@ -137,6 +140,21 @@ export default function EncounterPage() {
             qualification: doc?.qualification || doc?.qualifications,
             registration: doc?.registrationNumber || doc?.registration_number || doc?.medicalRegistrationId
           });
+        }
+        
+        // Set vitals configuration
+        if (vitalsConfigResp?.data?.data?.vitalsConfig) {
+          const config = vitalsConfigResp.data.data.vitalsConfig;
+          const enabled = config.filter((v: any) => v.isEnabled === true);
+          setEnabledVitals(enabled);
+        } else {
+          // Fallback: fetch all vitals definitions
+          try {
+            const allVitals = await getVitalsDefinitions();
+            setEnabledVitals(allVitals.data.data.vitals);
+          } catch {
+            console.warn('Could not fetch vitals definitions');
+          }
         }
         
         const api = resp.data;
@@ -159,14 +177,15 @@ export default function EncounterPage() {
           }
         }
         if (b.vitals) {
-          setVitals({
-            bloodPressure: b.vitals.bp || b.vitals.bloodPressure || "",
-            heartRate: b.vitals.pulse || b.vitals.heartRate || "",
-            temperature: b.vitals.temp || b.vitals.temperature || "",
-            weight: b.vitals.weight || "",
-            height: b.vitals.height || "",
-            spO2: b.vitals.spo2 || b.vitals.spO2 || "",
-          });
+          // Map API vitals to our dynamic vitals state
+          const vitalsFromApi: Vitals = {};
+          if (b.vitals.bp || b.vitals.bloodPressure) vitalsFromApi.bp = b.vitals.bp || b.vitals.bloodPressure || "";
+          if (b.vitals.pulse || b.vitals.heartRate) vitalsFromApi.pulse = String(b.vitals.pulse || b.vitals.heartRate || "");
+          if (b.vitals.temp || b.vitals.temperature) vitalsFromApi.temp = String(b.vitals.temp || b.vitals.temperature || "");
+          if (b.vitals.weight) vitalsFromApi.weight = String(b.vitals.weight || "");
+          if (b.vitals.height) vitalsFromApi.height = String(b.vitals.height || "");
+          if (b.vitals.spo2 || b.vitals.spO2) vitalsFromApi.spo2 = String(b.vitals.spo2 || b.vitals.spO2 || "");
+          setVitals(vitalsFromApi);
         }
       } catch (err: any) {
         console.error("Error loading encounter:", err);
@@ -319,11 +338,11 @@ export default function EncounterPage() {
           instructions: ""
         })),
         vitalSigns: {
-          bloodPressure: vitals.bloodPressure,
-          heartRate: vitals.heartRate,
-          temperature: vitals.temperature,
+          bloodPressure: vitals.bp || "",
+          heartRate: vitals.pulse || "",
+          temperature: vitals.temp || "",
           respiratoryRate: "",
-          oxygenSaturation: vitals.spO2
+          oxygenSaturation: vitals.spo2 || ""
         },
         doctorRemarks: additionalNotes,
         followUpInstructions: followUp
@@ -579,12 +598,12 @@ export default function EncounterPage() {
               gender: patient.gender
             }}
             vitals={{
-              bp: vitals.bloodPressure,
-              heartRate: vitals.heartRate,
-              temperature: vitals.temperature,
-              weight: vitals.weight,
-              height: vitals.height,
-              spO2: vitals.spO2
+              bp: vitals.bp || '',
+              heartRate: vitals.pulse || '',
+              temperature: vitals.temp || '',
+              weight: vitals.weight || '',
+              height: vitals.height || '',
+              spO2: vitals.spo2 || ''
             }}
             clinicalNotes={{
               chiefComplaint,
@@ -616,51 +635,35 @@ export default function EncounterPage() {
           {/* Vitals */}
           <div className="bg-white rounded-xl p-4 shadow-sm">
             <h3 className="font-semibold text-gray-900 mb-3">Vitals</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                type="text"
-                value={vitals.bloodPressure}
-                onChange={(e) => setVitals({ ...vitals, bloodPressure: e.target.value })}
-                placeholder="Blood Pressure"
-                disabled={isFinalized}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-100"
-              />
-              <input
-                type="text"
-                value={vitals.heartRate}
-                onChange={(e) => setVitals({ ...vitals, heartRate: e.target.value })}
-                placeholder="Heart Rate"
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-              <input
-                type="text"
-                value={vitals.temperature}
-                onChange={(e) => setVitals({ ...vitals, temperature: e.target.value })}
-                placeholder="Temperature"
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-              <input
-                type="text"
-                value={vitals.weight}
-                onChange={(e) => setVitals({ ...vitals, weight: e.target.value })}
-                placeholder="Weight"
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-              <input
-                type="text"
-                value={vitals.height}
-                onChange={(e) => setVitals({ ...vitals, height: e.target.value })}
-                placeholder="Height"
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-              <input
-                type="text"
-                value={vitals.spO2}
-                onChange={(e) => setVitals({ ...vitals, spO2: e.target.value })}
-                placeholder="SpO2"
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-            </div>
+            {enabledVitals.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                {enabledVitals.map((vital) => {
+                  const IconComponent = iconMap[vital.icon || 'activity'] || Activity;
+                  return (
+                    <div key={vital.key} className="flex items-center gap-2">
+                      <IconComponent className={`w-4 h-4 ${vital.color || 'text-gray-400'}`} />
+                      <input
+                        type={vital.input_type === 'text' ? 'text' : 'text'}
+                        value={vitals[vital.key] || ''}
+                        onChange={(e) => setVitals({ ...vitals, [vital.key]: e.target.value })}
+                        placeholder={vital.name}
+                        disabled={isFinalized}
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-100"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <input type="text" value={vitals.bp || ''} onChange={(e) => setVitals({ ...vitals, bp: e.target.value })} placeholder="Blood Pressure" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-100" />
+                <input type="text" value={vitals.pulse || ''} onChange={(e) => setVitals({ ...vitals, pulse: e.target.value })} placeholder="Heart Rate" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                <input type="text" value={vitals.temp || ''} onChange={(e) => setVitals({ ...vitals, temp: e.target.value })} placeholder="Temperature" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                <input type="text" value={vitals.weight || ''} onChange={(e) => setVitals({ ...vitals, weight: e.target.value })} placeholder="Weight" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                <input type="text" value={vitals.height || ''} onChange={(e) => setVitals({ ...vitals, height: e.target.value })} placeholder="Height" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                <input type="text" value={vitals.spo2 || ''} onChange={(e) => setVitals({ ...vitals, spo2: e.target.value })} placeholder="SpO2" disabled={isFinalized} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+              </div>
+            )}
           </div>
 
           {/* Chief Complaint & Symptoms (Combined) */}

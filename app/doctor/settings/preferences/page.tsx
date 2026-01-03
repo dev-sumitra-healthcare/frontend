@@ -16,13 +16,15 @@ import {
   Scale,
   Ruler,
   Wind,
-  Check
+  Check,
+  LucideIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { updateDoctorPreferences, getDoctorProfile } from "@/lib/api";
+import { Switch } from "@/components/ui/switch";
+import { updateDoctorPreferences, getDoctorProfile, getVitalsDefinitions, VitalDefinition } from "@/lib/api";
 import { toast } from "sonner";
 
 // Widget definitions for encounter form
@@ -34,8 +36,18 @@ const encounterWidgets = [
   { id: "notes", name: "Clinical Notes", icon: FileText, description: "Doctor's remarks and observations" },
 ];
 
-// Vitals definitions
-const vitalsItems = [
+// Icon mapping for vitals from database
+const iconMap: Record<string, LucideIcon> = {
+  heart: Heart,
+  activity: Activity,
+  thermometer: Thermometer,
+  scale: Scale,
+  ruler: Ruler,
+  wind: Wind,
+};
+
+// Fallback vitals if API fails
+const fallbackVitalsItems = [
   { id: "bp", name: "Blood Pressure", icon: Heart },
   { id: "pulse", name: "Pulse Rate", icon: Activity },
   { id: "temp", name: "Temperature", icon: Thermometer },
@@ -43,6 +55,13 @@ const vitalsItems = [
   { id: "height", name: "Height", icon: Ruler },
   { id: "spo2", name: "SpO2", icon: Wind },
 ];
+
+interface VitalItem {
+  id: string;
+  name: string;
+  icon: LucideIcon;
+  enabled: boolean;
+}
 
 // Simple drag-and-drop list using HTML5 API
 function DraggableList({ 
@@ -108,27 +127,54 @@ export default function PreferencesPage() {
   const [saved, setSaved] = useState(false);
   
   // Preferences state
-  const [vitalsOrder, setVitalsOrder] = useState(vitalsItems);
+  const [vitalsOrder, setVitalsOrder] = useState<VitalItem[]>([]);
   const [encounterOrder, setEncounterOrder] = useState(encounterWidgets);
   const [defaultView, setDefaultView] = useState<"compact" | "detailed" | "minimal">("detailed");
 
-  // Load current preferences
+  // Load vitals from database and current preferences
   useEffect(() => {
-    const loadPreferences = async () => {
+    const loadData = async () => {
       setLoading(true);
       try {
+        // Fetch vitals definitions from database
+        let vitalsFromApi: VitalItem[] = [];
+        try {
+          const vitalsResponse = await getVitalsDefinitions();
+          vitalsFromApi = vitalsResponse.data.data.vitals.map((v: VitalDefinition) => ({
+            id: v.key,
+            name: v.name,
+            icon: iconMap[v.icon || 'activity'] || Activity,
+            enabled: true // Default all enabled
+          }));
+        } catch (e) {
+          console.warn("Failed to fetch vitals from API, using fallback:", e);
+          vitalsFromApi = fallbackVitalsItems.map(v => ({ ...v, enabled: true }));
+        }
+
+        // Load doctor preferences
         const response = await getDoctorProfile();
         const doctor = response.data.data.doctor as any;
         const prefs = doctor.ui_preferences || {};
         
-        if (prefs.vitalsOrder?.length) {
-          const orderedVitals = prefs.vitalsOrder
-            .map((id: string) => vitalsItems.find(v => v.id === id))
-            .filter(Boolean);
-          // Add any missing items at the end
-          const missingVitals = vitalsItems.filter(v => !prefs.vitalsOrder.includes(v.id));
-          setVitalsOrder([...orderedVitals, ...missingVitals]);
-        }
+        // Apply saved order and enabled state
+        const enabledVitals = prefs.enabledVitals || vitalsFromApi.map(v => v.id);
+        const vitalsOrderIds = prefs.vitalsOrder || vitalsFromApi.map(v => v.id);
+        
+        // Reorder vitals based on saved order and set enabled state
+        const orderedVitals = vitalsOrderIds
+          .map((id: string) => {
+            const vital = vitalsFromApi.find(v => v.id === id);
+            if (!vital) return null;
+            return { ...vital, enabled: enabledVitals.includes(id) };
+          })
+          .filter(Boolean) as VitalItem[];
+        
+        // Add any new vitals from DB that aren't in the saved order
+        const missingVitals = vitalsFromApi
+          .filter(v => !vitalsOrderIds.includes(v.id))
+          .map(v => ({ ...v, enabled: true }));
+        
+        setVitalsOrder([...orderedVitals, ...missingVitals]);
         
         if (prefs.encounterFormOrder?.length) {
           const orderedWidgets = prefs.encounterFormOrder
@@ -143,13 +189,24 @@ export default function PreferencesPage() {
         }
       } catch (error) {
         console.error("Failed to load preferences:", error);
+        // Fallback to hardcoded vitals
+        setVitalsOrder(fallbackVitalsItems.map(v => ({ ...v, enabled: true })));
       } finally {
         setLoading(false);
       }
     };
     
-    loadPreferences();
+    loadData();
   }, []);
+
+  // Toggle vital enabled state
+  const toggleVitalEnabled = (vitalId: string) => {
+    setVitalsOrder(prev => 
+      prev.map(v => 
+        v.id === vitalId ? { ...v, enabled: !v.enabled } : v
+      )
+    );
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -157,6 +214,7 @@ export default function PreferencesPage() {
     try {
       await updateDoctorPreferences({
         vitalsOrder: vitalsOrder.map(v => v.id),
+        enabledVitals: vitalsOrder.filter(v => v.enabled).map(v => v.id),
         encounterFormOrder: encounterOrder.map(w => w.id),
         defaultView
       });
@@ -172,7 +230,7 @@ export default function PreferencesPage() {
   };
 
   const handleReset = () => {
-    setVitalsOrder(vitalsItems);
+    setVitalsOrder(prev => prev.map(v => ({ ...v, enabled: true })));
     setEncounterOrder(encounterWidgets);
     setDefaultView("detailed");
     toast.info("Preferences reset to defaults");
@@ -281,27 +339,40 @@ export default function PreferencesPage() {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Activity className="h-5 w-5 text-blue-600" />
-              Vitals Order
+              Vitals Configuration
             </CardTitle>
-            <CardDescription>Drag to reorder how vitals appear in your form</CardDescription>
+            <CardDescription>Toggle vitals on/off and drag to reorder. Coordinators will only see enabled vitals.</CardDescription>
           </CardHeader>
           <CardContent>
             <DraggableList
               items={vitalsOrder}
               onReorder={setVitalsOrder}
               renderItem={(item, index) => (
-                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-200 hover:bg-blue-50/50">
+                <div className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                  item.enabled 
+                    ? 'bg-gray-50 border-gray-200 hover:border-blue-200 hover:bg-blue-50/50' 
+                    : 'bg-gray-100/50 border-gray-200 opacity-60'
+                }`}>
                   <GripVertical className="h-5 w-5 text-gray-400" />
                   <div className="flex items-center gap-2 flex-1">
-                    <div className="p-1.5 bg-white rounded border">
-                      <item.icon className="h-4 w-4 text-gray-600" />
+                    <div className={`p-1.5 rounded border ${item.enabled ? 'bg-white' : 'bg-gray-200'}`}>
+                      <item.icon className={`h-4 w-4 ${item.enabled ? 'text-gray-600' : 'text-gray-400'}`} />
                     </div>
-                    <span className="font-medium text-sm">{item.name}</span>
+                    <span className={`font-medium text-sm ${item.enabled ? '' : 'text-gray-400'}`}>{item.name}</span>
                   </div>
-                  <span className="text-xs text-gray-400 font-mono">#{index + 1}</span>
+                  <Switch
+                    checked={item.enabled}
+                    onCheckedChange={() => toggleVitalEnabled(item.id)}
+                    aria-label={`Toggle ${item.name}`}
+                  />
+                  <span className="text-xs text-gray-400 font-mono w-6">#{index + 1}</span>
                 </div>
               )}
             />
+            <p className="text-xs text-gray-500 mt-3 flex items-center gap-1">
+              <Check className="h-3 w-3" />
+              {vitalsOrder.filter(v => v.enabled).length} vitals enabled for coordinator triage
+            </p>
           </CardContent>
         </Card>
 

@@ -571,6 +571,7 @@ export const updateDoctorProfile = async (data: UpdateDoctorProfileRequest): Pro
 // 7. Update Doctor UI Preferences (Configure Pad)
 export interface DoctorUIPreferences {
   vitalsOrder?: string[];           // e.g., ["bp", "pulse", "temp", "weight"]
+  enabledVitals?: string[];         // e.g., ["bp", "pulse", "temp"] - which vitals are enabled
   defaultView?: 'compact' | 'detailed' | 'minimal';
   encounterFormOrder?: string[];    // e.g., ["vitals", "diagnosis", "medications", "notes"]
 }
@@ -585,6 +586,62 @@ export interface UpdatePreferencesResponse {
 
 export const updateDoctorPreferences = async (preferences: DoctorUIPreferences): Promise<AxiosResponse<UpdatePreferencesResponse>> => {
   return apiClient.put("/doctors/me/preferences", preferences);
+};
+
+// --- Vitals Definitions API ---
+
+export interface VitalDefinition {
+  id: string;
+  key: string;              // e.g., "bp", "pulse"
+  name: string;             // e.g., "Blood Pressure"
+  unit: string | null;      // e.g., "mmHg"
+  input_type: string;       // "text" or "number"
+  placeholder: string | null;
+  icon: string | null;      // Lucide icon name
+  color: string | null;     // Tailwind color class
+  display_order: number;
+  is_active: boolean;
+  isEnabled?: boolean;      // Only present in config responses
+}
+
+export interface GetVitalsDefinitionsResponse {
+  success: boolean;
+  data: {
+    vitals: VitalDefinition[];
+  };
+}
+
+export interface GetDoctorVitalsConfigResponse {
+  success: boolean;
+  data: {
+    enabledVitals: string[];
+    vitalsConfig: VitalDefinition[];
+  };
+}
+
+export interface GetAppointmentVitalsConfigResponse {
+  success: boolean;
+  data: {
+    doctorId: string;
+    doctorName: string;
+    enabledVitals: string[];
+    vitalsConfig: VitalDefinition[];
+  };
+}
+
+// Get all active vitals definitions (public)
+export const getVitalsDefinitions = async (): Promise<AxiosResponse<GetVitalsDefinitionsResponse>> => {
+  return apiClient.get("/vitals/definitions");
+};
+
+// Get doctor's vitals config (requires doctor auth)
+export const getDoctorVitalsConfig = async (): Promise<AxiosResponse<GetDoctorVitalsConfigResponse>> => {
+  return apiClient.get("/vitals/config");
+};
+
+// Get vitals config for an appointment (for coordinator triage)
+export const getAppointmentVitalsConfig = async (appointmentId: string): Promise<AxiosResponse<GetAppointmentVitalsConfigResponse>> => {
+  return apiClient.get(`/coordinator/appointments/${appointmentId}/vitals-config`);
 };
 
 // --- Coordinator Triage API Functions ---
