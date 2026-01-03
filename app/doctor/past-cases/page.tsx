@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, Eye, Download, Loader2 } from "lucide-react";
+import { Calendar, Eye, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import StatusBadge, { CaseStatusBadge } from "@/components/doctor/StatusBadge";
@@ -16,8 +16,6 @@ import {
   searchEncounters,
   EncounterSearchResult,
   getEncounterDetails,
-  getPrescriptionsByEncounter,
-  downloadPrescriptionPDF,
   EncounterDataResponse
 } from "@/lib/api";
 
@@ -156,33 +154,7 @@ export default function PastCasesPage() {
     }
   };
 
-  const handleDownloadPrescription = async (caseItem: EncounterSearchResult) => {
-    try {
-      const toastId = toast.loading("Finding prescription...");
-      
-      // Get prescriptions for this encounter
-      const response = await getPrescriptionsByEncounter(caseItem.id);
-      
-      if (response.data.success && response.data.data.prescriptions && response.data.data.prescriptions.length > 0) {
-        // Download the most recent prescription
-        const prescription = response.data.data.prescriptions[0];
-        toast.dismiss(toastId);
-        toast.loading("Downloading PDF...", { id: toastId });
-        
-        await downloadPrescriptionPDF(prescription.id);
-        
-        toast.dismiss(toastId);
-        toast.success("Download started");
-      } else {
-        toast.dismiss(toastId);
-        toast.error("No prescription found for this case");
-      }
-    } catch (error) {
-      console.error("Error downloading prescription:", error);
-      toast.dismiss();
-      toast.error("Failed to download prescription");
-    }
-  };
+
 
   // Extract diagnosis names from the diagnosis array
   const getDiagnosisNames = (diagnosis: EncounterSearchResult["diagnosis"]): string[] => {
@@ -418,13 +390,7 @@ export default function PastCasesPage() {
                   >
                     <Eye className="h-4 w-4" />
                   </button>
-                  <button 
-                    onClick={() => handleDownloadPrescription(caseItem)}
-                    className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-                    title="Download Prescription"
-                  >
-                    <Download className="h-4 w-4" />
-                  </button>
+
                 </div>
               </div>
             ))}
