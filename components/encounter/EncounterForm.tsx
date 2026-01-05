@@ -11,9 +11,17 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { PDFViewer, pdf } from "@react-pdf/renderer";
-import { PrescriptionPDF } from "@/components/prescriptions/PrescriptionPDF";
+import dynamic from 'next/dynamic';
 import { finalizeEncounter, FinalizeEncounterRequest, createPrescription, CreatePrescriptionRequest, getTemplates, type PrescriptionTemplate, getDoctorProfile } from "@/lib/api";
+
+// Dynamic import for PDF components
+const PDFViewerWrapper = dynamic(
+  () => import("@/components/pdf/PDFViewerWrapper"),
+  {
+    ssr: false,
+    loading: () => <div className="flex items-center justify-center h-full">Loading PDF preview...</div>
+  }
+);
 
 // Define the unified schema for encounter and prescription
 const encounterFormSchema = z.object({
@@ -265,7 +273,11 @@ export default function EncounterForm({ data = {}, encounterId, appointmentId, p
   const handleDownloadPDF = async () => {
     try {
       const values = form.getValues();
-      
+
+      // Dynamically import PDF components
+      const { PrescriptionPDF } = await import('@/components/prescriptions/PrescriptionPDF');
+      const { pdf } = await import('@react-pdf/renderer');
+
       const pdfDoc = (
         <PrescriptionPDF
           patientName={patientInfo.fullName || patientInfo.full_name || 'Patient'}
@@ -303,7 +315,7 @@ export default function EncounterForm({ data = {}, encounterId, appointmentId, p
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      
+
       toast.success('Prescription PDF downloaded successfully!');
     } catch (error) {
       console.error('Error downloading PDF:', error);
@@ -646,33 +658,34 @@ export default function EncounterForm({ data = {}, encounterId, appointmentId, p
               </div>
             </div>
             <div className="border rounded-md overflow-hidden" style={{ height: '600px' }}>
-              <PDFViewer width="100%" height="100%" showToolbar>
-                <PrescriptionPDF
-                  patientName={patientInfo.fullName || patientInfo.full_name || 'Patient'}
-                  patientAge={
-                    patientInfo.dateOfBirth || patientInfo.date_of_birth
-                      ? Math.max(
-                          0,
-                          Math.floor(
-                            (Date.now() - new Date(patientInfo.dateOfBirth || patientInfo.date_of_birth!).getTime()) /
-                            (365.25 * 24 * 60 * 60 * 1000)
-                          )
+              <PDFViewerWrapper
+                width="100%"
+                height="100%"
+                showToolbar={true}
+                patientName={patientInfo.fullName || patientInfo.full_name || 'Patient'}
+                patientAge={
+                  patientInfo.dateOfBirth || patientInfo.date_of_birth
+                    ? Math.max(
+                        0,
+                        Math.floor(
+                          (Date.now() - new Date(patientInfo.dateOfBirth || patientInfo.date_of_birth!).getTime()) /
+                          (365.25 * 24 * 60 * 60 * 1000)
                         )
-                      : undefined
-                  }
-                  patientGender={patientInfo.gender}
-                  patientUHID={patientInfo.uhid}
-                  date={new Date().toISOString()}
-                  doctorName={doctorInfo?.name || 'Doctor'}
-                  doctorQualification={doctorInfo?.qualification}
-                  doctorRegistration={doctorInfo?.registration}
-                  medications={form.watch('medications')}
-                  advice={form.watch('advice')}
-                  tests={form.watch('tests')}
-                  followUp={form.watch('followUpInstructions')}
-                  notes={form.watch('notes')}
-                />
-              </PDFViewer>
+                      )
+                    : undefined
+                }
+                patientGender={patientInfo.gender}
+                patientUHID={patientInfo.uhid}
+                date={new Date().toISOString()}
+                doctorName={doctorInfo?.name || 'Doctor'}
+                doctorQualification={doctorInfo?.qualification}
+                doctorRegistration={doctorInfo?.registration}
+                medications={form.watch('medications')}
+                advice={form.watch('advice')}
+                tests={form.watch('tests')}
+                followUp={form.watch('followUpInstructions')}
+                notes={form.watch('notes')}
+              />
             </div>
             <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
               <p className="text-sm text-blue-700">

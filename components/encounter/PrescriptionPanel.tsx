@@ -9,8 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PrescriptionViewer } from "@/components/prescriptions/PrescriptionViewer";
-import { PDFViewer } from "@react-pdf/renderer";
-import { PrescriptionPDF } from "@/components/prescriptions/PrescriptionPDF";
+import dynamic from 'next/dynamic';
 import {
   getTemplates,
   createPrescription,
@@ -21,6 +20,15 @@ import {
   type CreatePrescriptionRequest,
 } from "@/lib/api";
 import { toast } from "sonner";
+
+// Dynamic import for PDF viewer
+const PDFViewerWrapper = dynamic(
+  () => import("@/components/pdf/PDFViewerWrapper"),
+  {
+    ssr: false,
+    loading: () => <div className="flex items-center justify-center h-full">Loading PDF preview...</div>
+  }
+);
 
 const schema = z.object({
   templateId: z.string().optional().nullable(),
@@ -317,23 +325,24 @@ export default function PrescriptionPanel({ encounterId, patient }: Prescription
             <div className="mt-6">
               <h4 className="text-md font-medium mb-2">Live PDF Preview</h4>
               <div className="border rounded-md overflow-hidden" style={{ height: 500 }}>
-                <PDFViewer width="100%" height="100%" showToolbar>
-                  <PrescriptionPDF
-                    patientName={patientName}
-                    patientAge={patientDOB ? Math.max(0, Math.floor((Date.now() - new Date(patientDOB).getTime()) / (365.25 * 24 * 60 * 60 * 1000))) : undefined}
-                    patientGender={patientGender}
-                    patientUHID={patientUHID}
-                    date={new Date().toISOString()}
-                    doctorName={doctorInfo?.name || "Doctor"}
-                    doctorQualification={doctorInfo?.qualification}
-                    doctorRegistration={doctorInfo?.registration}
-                    medications={form.watch("medications")}
-                    advice={form.watch("advice")}
-                    tests={form.watch("tests")}
-                    followUp={form.watch("followUp")}
-                    notes={form.watch("notes")}
-                  />
-                </PDFViewer>
+                <PDFViewerWrapper
+                  width="100%"
+                  height="100%"
+                  showToolbar={true}
+                  patientName={patientName}
+                  patientAge={patientDOB ? Math.max(0, Math.floor((Date.now() - new Date(patientDOB).getTime()) / (365.25 * 24 * 60 * 60 * 1000))) : undefined}
+                  patientGender={patientGender}
+                  patientUHID={patientUHID}
+                  date={new Date().toISOString()}
+                  doctorName={doctorInfo?.name || "Doctor"}
+                  doctorQualification={doctorInfo?.qualification}
+                  doctorRegistration={doctorInfo?.registration}
+                  medications={form.watch("medications")}
+                  advice={form.watch("advice")}
+                  tests={form.watch("tests")}
+                  followUp={form.watch("followUp")}
+                  notes={form.watch("notes")}
+                />
               </div>
             </div>
           )}

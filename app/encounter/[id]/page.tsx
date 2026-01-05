@@ -18,14 +18,20 @@ import {
   VitalDefinition
 } from "@/lib/api";
 import dynamic from "next/dynamic";
-import { PrescriptionPDF } from "@/components/prescriptions/PrescriptionPDF";
 import EncounterPreview from "@/components/doctor/EncounterPreview";
 import { RecommendationSection } from "@/components/doctor/RecommendationSection";
 
-// Dynamically import PDFViewer to avoid SSR issues
-const PDFViewer = dynamic(
-  () => import("@react-pdf/renderer").then((mod) => mod.PDFViewer),
-  { ssr: false, loading: () => <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin h-8 w-8 text-blue-500" /></div> }
+// Dynamically import PDF viewer wrapper to avoid SSR issues
+const PDFViewerWrapper = dynamic(
+  () => import("@/components/pdf/PDFViewerWrapper"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="animate-spin h-8 w-8 text-blue-500" />
+      </div>
+    )
+  }
 );
 
 // Types
