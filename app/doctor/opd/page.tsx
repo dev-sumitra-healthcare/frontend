@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Search, Clock, User, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -71,34 +72,27 @@ function mapPaymentStatus(paymentStatus?: string | null): "completed" | "process
 
 export default function OPDQueuePage() {
   const router = useRouter();
-  const [queue, setQueue] = useState<DashboardQueueItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-
-  useEffect(() => {
-    loadQueue();
-  }, []);
-
-  const loadQueue = async () => {
-    try {
-      setIsLoading(true);
+  // Fetch queue with auto-refresh
+  const { data: queue = [], isLoading, error } = useQuery({
+    queryKey: ['doctor-dashboard-queue'],
+    queryFn: async () => {
       const response = await getDoctorDashboard();
-
       if (response.data.status === "success") {
-        setQueue(response.data.data.todaysQueue || []);
+        return response.data.data.todaysQueue || [];
       }
-    } catch (error: unknown) {
-      console.error("Error loading queue:", error);
-      const errorMessage = error && typeof error === "object" && "response" in error
-        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
-        : undefined;
-      toast.error("Failed to load queue", {
-        description: errorMessage || "Please try again",
-      });
-    } finally {
-      setIsLoading(false);
+      return [];
+    },
+    refetchInterval: 15000, // Refresh every 15 seconds
+  });
+
+  // Handle errors via effect or inline checking (for toast)
+  useEffect(() => {
+    if (error) {
+       console.error("Error loading queue:", error);
+       toast.error("Failed to refresh queue");
     }
-  };
+  }, [error]);
 
   const handleStartConsultation = (appointmentId: string) => {
     router.push(`/encounter/${appointmentId}`);

@@ -1,16 +1,27 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, Eye, Download, Loader2 } from "lucide-react";
+import { Calendar, Eye, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import StatusBadge, { CaseStatusBadge } from "@/components/doctor/StatusBadge";
-import { searchEncounters, EncounterSearchResult } from "@/lib/api";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  searchEncounters,
+  EncounterSearchResult,
+  getEncounterDetails,
+  EncounterDataResponse
+} from "@/lib/api";
 
 // Diagnosis color mapping
 function getDiagnosisColor(diagnosis: string): "diagnosis-red" | "diagnosis-orange" | "diagnosis-blue" | "diagnosis-purple" {
-  const lowerDiag = diagnosis.toLowerCase();
+  const lowerDiag = (diagnosis || "").toLowerCase();
   if (lowerDiag.includes("hypertension") || lowerDiag.includes("cardiac") || lowerDiag.includes("heart") || lowerDiag.includes("fibrillation")) {
     return "diagnosis-red";
   }
@@ -57,6 +68,11 @@ export default function PastCasesPage() {
     medication: "",
     keywords: "",
   });
+
+  // View Modal State
+  const [selectedEncounter, setSelectedEncounter] = useState<EncounterDataResponse["data"]["bundle"] | null>(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isViewLoading, setIsViewLoading] = useState(false);
 
   useEffect(() => {
     loadCases();
@@ -116,10 +132,45 @@ export default function PastCasesPage() {
     loadCases(filters);
   };
 
+  const handleViewCase = async (caseItem: EncounterSearchResult) => {
+    try {
+      setIsViewOpen(true);
+      setIsViewLoading(true);
+      
+      // Use appointmentId to get encounter bundle
+      const response = await getEncounterDetails(caseItem.appointmentId);
+      if (response.data.success) {
+        setSelectedEncounter(response.data.data.bundle);
+      } else {
+        toast.error("Failed to load case details");
+        setIsViewOpen(false);
+      }
+    } catch (error) {
+      console.error("Error viewing case:", error);
+      toast.error("Failed to load case details");
+      setIsViewOpen(false);
+    } finally {
+      setIsViewLoading(false);
+    }
+  };
+
+
+
   // Extract diagnosis names from the diagnosis array
+  // Handles cases where diagnosis might be the AI summary text by truncating
   const getDiagnosisNames = (diagnosis: EncounterSearchResult["diagnosis"]): string[] => {
     if (!diagnosis || !Array.isArray(diagnosis)) return [];
-    return diagnosis.map(d => d.description || "Unknown").slice(0, 3);
+    return diagnosis
+      .map(d => {
+        // Prefer 'name' field, fallback to 'description', then 'code'
+        const text = d.name || d.description || d.code || "Unknown";
+        // Truncate long text (e.g., AI summaries accidentally stored here)
+        if (text.length > 40) {
+          return text.substring(0, 37) + "...";
+        }
+        return text;
+      })
+      .slice(0, 2); // Show max 2 diagnoses
   };
 
   // Get symptoms to display (max 3)
@@ -343,18 +394,129 @@ export default function PastCasesPage() {
 
                 {/* Actions */}
                 <div className="col-span-1 flex items-center justify-center gap-2">
-                  <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
+                  <button 
+                    onClick={() => handleViewCase(caseItem)}
+                    className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                    title="View Details"
+                  >
                     <Eye className="h-4 w-4" />
                   </button>
-                  <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
-                    <Download className="h-4 w-4" />
-                  </button>
+
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* View Details Modal */}
+      <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
+        <DialogContent className="sm:max-w-3xl w-full max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Case Details</DialogTitle>
+          </DialogHeader>
+          
+          {isViewLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <span className="ml-3 text-gray-600">Loading details...</span>
+            </div>
+          ) : selectedEncounter ? (
+            <div className="space-y-6">
+              {/* Patient Info */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="text-sm text-gray-500">Patient Name</p>
+                  <p className="font-medium">{selectedEncounter.patient.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">UHID</p>
+                  <p className="font-medium">{selectedEncounter.patient.uhid}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Age/Gender</p>
+                  <p className="font-medium">
+                    {selectedEncounter.patient.demographics.age} Y / {selectedEncounter.patient.demographics.gender}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Date</p>
+                  <p className="font-medium">
+                    {new Date().toLocaleDateString()} {/* Date might need to be passed or parsed from updated_at if available */}
+                  </p>
+                </div>
+              </div>
+
+              {/* Clinical Data */}
+              <div className="space-y-4">
+                {selectedEncounter.encounterForm.chiefComplaint && (
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-2">Chief Complaint</h3>
+                    <p className="text-gray-700 p-3 bg-white border rounded-md">
+                      {selectedEncounter.encounterForm.chiefComplaint}
+                    </p>
+                  </div>
+                )}
+
+                {selectedEncounter.encounterForm.diagnosis && selectedEncounter.encounterForm.diagnosis.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-2">Diagnosis</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedEncounter.encounterForm.diagnosis.map((d: any, i) => {
+                        const diagName = d.name || d.description || "Unknown";
+                        return (
+                          <StatusBadge key={i} variant={getDiagnosisColor(diagName)}>
+                            {diagName}
+                          </StatusBadge>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {selectedEncounter.encounterForm.medications && selectedEncounter.encounterForm.medications.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-2">Prescribed Medications</h3>
+                    <div className="border rounded-md overflow-hidden">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-gray-50 text-gray-700">
+                          <tr>
+                            <th className="px-4 py-2 font-medium">Medicine</th>
+                            <th className="px-4 py-2 font-medium">Dosage</th>
+                            <th className="px-4 py-2 font-medium">Frequency</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {selectedEncounter.encounterForm.medications.map((med: any, i) => (
+                            <tr key={i}>
+                              <td className="px-4 py-2">{med.name}</td>
+                              <td className="px-4 py-2">{med.dosage || "-"}</td>
+                              <td className="px-4 py-2">{med.frequency || med.instructions || "-"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {selectedEncounter.aiAnalysis && selectedEncounter.aiAnalysis.summary && (
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-2">AI Summary</h3>
+                    <p className="text-sm text-gray-600 italic bg-blue-50 p-3 rounded-md border border-blue-100">
+                      {selectedEncounter.aiAnalysis.summary}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              No details available
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

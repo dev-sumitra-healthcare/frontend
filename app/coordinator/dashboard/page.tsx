@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import {
   getCoordinatorAppointmentsByDate,
@@ -63,83 +64,67 @@ const StatusIndicator = ({ label, status }: { label: string; status: StatusLevel
 
 export default function CoordinatorDashboard() {
   const router = useRouter();
-  const [patients, setPatients] = useState<QueuePatient[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const today = new Date();
+  
+  // Format today's date for consistent query key
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const dateStr = `${year}-${month}-${day}`;
 
-  useEffect(() => {
-    loadTodayAppointments();
-  }, []);
-
-  const loadTodayAppointments = async () => {
-    try {
-      setLoading(true);
-      setError('');
-
-      // Format today's date
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const day = String(today.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-
+  const { data: patients = [], isLoading: loading, error } = useQuery({
+    queryKey: ['coordinator-appointments', dateStr],
+    queryFn: async () => {
       const response = await getCoordinatorAppointmentsByDate(dateStr);
-
-      if (response.data.success) {
-        const appointments = response.data.data.appointments || [];
-        
-        // Transform appointments to queue patients
-        const queuePatients: QueuePatient[] = appointments.map((apt: CoordinatorAppointment) => {
-          // Determine overall status based on appointment status
-          let status: PatientStatus = 'waiting';
-          if (apt.status === 'In-Consultation' || apt.status === 'Documentation-Pending') {
-            status = 'in-progress';
-          } else if (apt.status === 'Completed') {
-            status = 'completed';
-          }
-
-          // Determine Payment and Vitals status independently
-          // For now, derive from appointment status (can be enhanced with actual API data)
-          let paymentStatus: StatusLevel = 'not-started';
-          let vitalsStatus: StatusLevel = 'not-started';
-
-          if (apt.status === 'In-Consultation') {
-            // Both should be at least under process
-            paymentStatus = 'under-process';
-            vitalsStatus = 'under-process';
-          } else if (apt.status === 'Documentation-Pending' || apt.status === 'Completed') {
-            // Both done
-            paymentStatus = 'done';
-            vitalsStatus = 'done';
-          }
-
-          return {
-            appointmentId: apt.appointmentId,
-            patientId: apt.patient.id,
-            patientName: apt.patient.fullName,
-            uhid: apt.patient.uhid,
-            age: 0,
-            gender: 'Unknown',
-            appointmentTime: new Date(apt.scheduledTime).toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: true
-            }),
-            paymentStatus,
-            vitalsStatus,
-            status
-          };
-        });
-
-        setPatients(queuePatients);
+      
+      if (!response.data.success) {
+        throw new Error((response.data as any).message || 'Failed to load patient queue');
       }
-    } catch (err: any) {
-      console.error('Failed to load appointments:', err);
-      setError(err.response?.data?.message || 'Failed to load patient queue');
-    } finally {
-      setLoading(false);
-    }
-  };
+
+      const appointments = response.data.data.appointments || [];
+      
+      // Transform appointments to queue patients
+      return appointments.map((apt: CoordinatorAppointment) => {
+        // Determine overall status based on appointment status
+        let status: PatientStatus = 'waiting';
+        if (apt.status === 'In-Consultation' || apt.status === 'Documentation-Pending') {
+          status = 'in-progress';
+        } else if (apt.status === 'Completed') {
+          status = 'completed';
+        }
+
+        // Determine Payment and Vitals status independently
+        let paymentStatus: StatusLevel = 'not-started';
+        let vitalsStatus: StatusLevel = 'not-started';
+
+        if (apt.status === 'In-Consultation') {
+          paymentStatus = 'under-process';
+          vitalsStatus = 'under-process';
+        } else if (apt.status === 'Documentation-Pending' || apt.status === 'Completed') {
+          paymentStatus = 'done';
+          vitalsStatus = 'done';
+        }
+
+        return {
+          appointmentId: apt.appointmentId,
+          patientId: apt.patient.id,
+          patientName: apt.patient.fullName,
+          uhid: apt.patient.uhid,
+          age: 0,
+          gender: 'Unknown',
+          appointmentTime: new Date(apt.scheduledTime).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          }),
+          paymentStatus,
+          vitalsStatus,
+          status
+        };
+      });
+    },
+    refetchInterval: 15000, // Refresh every 15 seconds
+  });
 
   const waitingPatients = patients.filter(p => p.status === 'waiting');
   const inProgressPatients = patients.filter(p => p.status === 'in-progress');
@@ -221,9 +206,9 @@ export default function CoordinatorDashboard() {
   if (error) {
     return (
       <div className="bg-white rounded-[16px] border border-red-200 p-8 text-center">
-        <div className="text-red-600 mb-4">{error}</div>
+        <div className="text-red-600 mb-4">{error instanceof Error ? error.message : 'Unknown error'}</div>
         <button 
-          onClick={loadTodayAppointments}
+          onClick={() => window.location.reload()}
           className="px-4 py-2 bg-[#10B981] text-white rounded-lg hover:bg-[#059669] transition-colors"
         >
           Try Again

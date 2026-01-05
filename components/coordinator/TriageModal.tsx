@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
-  X, 
   Activity, 
   CreditCard, 
   Check,
@@ -11,7 +10,8 @@ import {
   Thermometer,
   Scale,
   Ruler,
-  Wind
+  Wind,
+  LucideIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +32,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createTriageEncounter, TriageVitals, TriagePayment } from "@/lib/api";
+import { 
+  createTriageEncounter, 
+  getAppointmentVitalsConfig, 
+  TriageVitals, 
+  TriagePayment,
+  VitalDefinition 
+} from "@/lib/api";
 import { toast } from "sonner";
 
 interface PatientInfo {
@@ -50,6 +56,26 @@ interface TriageModalProps {
   onSuccess?: () => void;
 }
 
+// Icon mapping from database key to Lucide icon
+const iconMap: Record<string, LucideIcon> = {
+  heart: Heart,
+  activity: Activity,
+  thermometer: Thermometer,
+  scale: Scale,
+  ruler: Ruler,
+  wind: Wind,
+};
+
+// Fallback vitals configuration if API fails
+const fallbackVitals: VitalDefinition[] = [
+  { id: '1', key: 'bp', name: 'Blood Pressure', unit: 'mmHg', input_type: 'text', placeholder: '120/80', icon: 'heart', color: 'text-red-500', display_order: 1, is_active: true },
+  { id: '2', key: 'pulse', name: 'Pulse Rate', unit: 'bpm', input_type: 'number', placeholder: '72', icon: 'activity', color: 'text-pink-500', display_order: 2, is_active: true },
+  { id: '3', key: 'temp', name: 'Temperature', unit: '°F', input_type: 'number', placeholder: '98.6', icon: 'thermometer', color: 'text-orange-500', display_order: 3, is_active: true },
+  { id: '4', key: 'weight', name: 'Weight', unit: 'kg', input_type: 'number', placeholder: '70', icon: 'scale', color: 'text-blue-500', display_order: 4, is_active: true },
+  { id: '5', key: 'height', name: 'Height', unit: 'cm', input_type: 'number', placeholder: '170', icon: 'ruler', color: 'text-green-500', display_order: 5, is_active: true },
+  { id: '6', key: 'spo2', name: 'SpO2', unit: '%', input_type: 'number', placeholder: '98', icon: 'wind', color: 'text-cyan-500', display_order: 6, is_active: true },
+];
+
 export function TriageModal({ 
   open, 
   onOpenChange, 
@@ -59,15 +85,12 @@ export function TriageModal({
 }: TriageModalProps) {
   const [activeTab, setActiveTab] = useState("vitals");
   const [submitting, setSubmitting] = useState(false);
+  const [loadingConfig, setLoadingConfig] = useState(false);
+  const [enabledVitals, setEnabledVitals] = useState<VitalDefinition[]>([]);
+  const [doctorName, setDoctorName] = useState<string>("");
   
-  // Vitals state
-  const [vitals, setVitals] = useState<TriageVitals>({
-    bp: "",
-    pulse: undefined,
-    temp: undefined,
-    weight: undefined,
-    height: undefined
-  });
+  // Dynamic vitals state (key -> value)
+  const [vitals, setVitals] = useState<Record<string, string | number | undefined>>({});
   
   // Payment state
   const [payment, setPayment] = useState<Partial<TriagePayment>>({
@@ -76,10 +99,53 @@ export function TriageModal({
     status: "paid"
   });
 
-  const handleVitalsChange = (field: keyof TriageVitals, value: string) => {
+  // Fetch vitals configuration when modal opens
+  useEffect(() => {
+    if (open && appointmentId) {
+      fetchVitalsConfig();
+    }
+  }, [open, appointmentId]);
+
+  const fetchVitalsConfig = async () => {
+    setLoadingConfig(true);
+    try {
+      const response = await getAppointmentVitalsConfig(appointmentId);
+      console.log('[TriageModal] Raw API response:', response.data);
+      
+      const { vitalsConfig, doctorName: name } = response.data.data;
+      console.log('[TriageModal] vitalsConfig:',  vitalsConfig);
+      console.log('[TriageModal] Each vital isEnabled:', vitalsConfig.map((v: any) => ({ key: v.key, isEnabled: v.isEnabled })));
+      
+      // Filter to only enabled vitals
+      const enabled = vitalsConfig.filter((v: any) => v.isEnabled === true);
+      console.log('[TriageModal] Filtered enabled vitals:', enabled.length, enabled.map((v: any) => v.key));
+      
+      setEnabledVitals(enabled);
+      setDoctorName(name);
+      
+      // Initialize vitals state based on config
+      const initialVitals: Record<string, string | number | undefined> = {};
+      enabled.forEach((v: any) => {
+        initialVitals[v.key] = v.input_type === 'text' ? '' : undefined;
+      });
+      setVitals(initialVitals);
+    } catch (error) {
+      console.warn("Failed to fetch vitals config, using fallback:", error);
+      setEnabledVitals(fallbackVitals);
+      const initialVitals: Record<string, string | number | undefined> = {};
+      fallbackVitals.forEach(v => {
+        initialVitals[v.key] = v.input_type === 'text' ? '' : undefined;
+      });
+      setVitals(initialVitals);
+    } finally {
+      setLoadingConfig(false);
+    }
+  };
+
+  const handleVitalsChange = (key: string, value: string, inputType: string) => {
     setVitals(prev => ({
       ...prev,
-      [field]: field === "bp" ? value : value ? parseFloat(value) : undefined
+      [key]: inputType === 'text' ? value : value ? parseFloat(value) : undefined
     }));
   };
 
@@ -93,11 +159,21 @@ export function TriageModal({
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
+      // Convert dynamic vitals to TriageVitals format
+      const triageVitals: TriageVitals = {
+        bp: vitals.bp as string || undefined,
+        pulse: vitals.pulse as number || undefined,
+        temp: vitals.temp as number || undefined,
+        weight: vitals.weight as number || undefined,
+        height: vitals.height as number || undefined,
+        spo2: vitals.spo2 as number || undefined,
+      };
+
+      const hasVitals = Object.values(vitals).some(v => v !== undefined && v !== '');
+      
       await createTriageEncounter(appointmentId, {
-        vitals: Object.keys(vitals).some(k => vitals[k as keyof TriageVitals]) 
-          ? vitals 
-          : undefined,
-        payment: payment.amount && payment.amount > 0 
+        vitals: hasVitals ? triageVitals : undefined,
+        payment: payment.amount && Number(payment.amount) > 0 
           ? payment as TriagePayment 
           : undefined
       });
@@ -107,7 +183,11 @@ export function TriageModal({
       onSuccess?.();
       
       // Reset form
-      setVitals({ bp: "", pulse: undefined, temp: undefined, weight: undefined, height: undefined });
+      const resetVitals: Record<string, string | number | undefined> = {};
+      enabledVitals.forEach(v => {
+        resetVitals[v.key] = v.input_type === 'text' ? '' : undefined;
+      });
+      setVitals(resetVitals);
       setPayment({ amount: 0, method: "Cash", status: "paid" });
     } catch (error: any) {
       console.error("Triage failed:", error);
@@ -117,8 +197,12 @@ export function TriageModal({
     }
   };
 
-  const isVitalsValid = vitals.bp || vitals.pulse || vitals.temp || vitals.weight;
-  const isPaymentValid = payment.amount && payment.amount > 0;
+  const hasVitals = Object.values(vitals).some(v => v !== undefined && v !== '');
+  const isPaymentValid = payment.amount && Number(payment.amount) > 0;
+
+  const getIcon = (iconName: string | null): LucideIcon => {
+    return iconMap[iconName || 'activity'] || Activity;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -131,6 +215,7 @@ export function TriageModal({
           <DialogDescription>
             Record vitals and collect payment for <span className="font-medium text-gray-900">{patient.name}</span> 
             <span className="text-gray-500 ml-1">({patient.uhid})</span>
+            {doctorName && <span className="text-gray-500"> • Dr. {doctorName}</span>}
           </DialogDescription>
         </DialogHeader>
 
@@ -139,7 +224,7 @@ export function TriageModal({
             <TabsTrigger value="vitals" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               Vitals
-              {isVitalsValid && <Check className="h-3 w-3 text-green-600" />}
+              {hasVitals && <Check className="h-3 w-3 text-green-600" />}
             </TabsTrigger>
             <TabsTrigger value="payment" className="flex items-center gap-2">
               <CreditCard className="h-4 w-4" />
@@ -150,91 +235,39 @@ export function TriageModal({
 
           {/* Vitals Tab */}
           <TabsContent value="vitals" className="space-y-4 mt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="bp" className="flex items-center gap-2">
-                  <Heart className="h-4 w-4 text-red-500" />
-                  Blood Pressure
-                </Label>
-                <Input
-                  id="bp"
-                  placeholder="120/80"
-                  value={vitals.bp || ""}
-                  onChange={(e) => handleVitalsChange("bp", e.target.value)}
-                />
+            {loadingConfig ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                <span className="ml-2 text-gray-500">Loading vitals configuration...</span>
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="pulse" className="flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-pink-500" />
-                  Pulse (bpm)
-                </Label>
-                <Input
-                  id="pulse"
-                  type="number"
-                  placeholder="72"
-                  value={vitals.pulse || ""}
-                  onChange={(e) => handleVitalsChange("pulse", e.target.value)}
-                />
+            ) : enabledVitals.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Activity className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>No vitals configured by the doctor</p>
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="temp" className="flex items-center gap-2">
-                  <Thermometer className="h-4 w-4 text-orange-500" />
-                  Temperature (°F)
-                </Label>
-                <Input
-                  id="temp"
-                  type="number"
-                  step="0.1"
-                  placeholder="98.6"
-                  value={vitals.temp || ""}
-                  onChange={(e) => handleVitalsChange("temp", e.target.value)}
-                />
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                {enabledVitals.map((vital) => {
+                  const IconComponent = getIcon(vital.icon);
+                  return (
+                    <div key={vital.key} className="space-y-2">
+                      <Label htmlFor={vital.key} className="flex items-center gap-2">
+                        <IconComponent className={`h-4 w-4 ${vital.color || 'text-gray-500'}`} />
+                        {vital.name} {vital.unit && `(${vital.unit})`}
+                      </Label>
+                      <Input
+                        id={vital.key}
+                        type={vital.input_type === 'text' ? 'text' : 'number'}
+                        step={vital.input_type === 'number' ? '0.1' : undefined}
+                        placeholder={vital.placeholder || ''}
+                        value={vitals[vital.key] || ''}
+                        onChange={(e) => handleVitalsChange(vital.key, e.target.value, vital.input_type)}
+                      />
+                    </div>
+                  );
+                })}
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="weight" className="flex items-center gap-2">
-                  <Scale className="h-4 w-4 text-blue-500" />
-                  Weight (kg)
-                </Label>
-                <Input
-                  id="weight"
-                  type="number"
-                  step="0.1"
-                  placeholder="70"
-                  value={vitals.weight || ""}
-                  onChange={(e) => handleVitalsChange("weight", e.target.value)}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="height" className="flex items-center gap-2">
-                  <Ruler className="h-4 w-4 text-green-500" />
-                  Height (cm)
-                </Label>
-                <Input
-                  id="height"
-                  type="number"
-                  placeholder="170"
-                  value={vitals.height || ""}
-                  onChange={(e) => handleVitalsChange("height", e.target.value)}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="spo2" className="flex items-center gap-2">
-                  <Wind className="h-4 w-4 text-cyan-500" />
-                  SpO2 (%)
-                </Label>
-                <Input
-                  id="spo2"
-                  type="number"
-                  placeholder="98"
-                  disabled
-                />
-              </div>
-            </div>
+            )}
           </TabsContent>
 
           {/* Payment Tab */}
@@ -288,7 +321,7 @@ export function TriageModal({
                 </div>
               </div>
 
-              {payment.status === "paid" && payment.amount && payment.amount > 0 && (
+              {payment.status === "paid" && payment.amount && Number(payment.amount) > 0 && (
                 <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <span className="text-green-700 font-medium">Amount Received</span>
@@ -307,7 +340,7 @@ export function TriageModal({
           </Button>
           <Button 
             onClick={handleSubmit} 
-            disabled={submitting || (!isVitalsValid && !isPaymentValid)}
+            disabled={submitting || loadingConfig || (!hasVitals && !isPaymentValid)}
             className="min-w-[140px]"
           >
             {submitting ? (
