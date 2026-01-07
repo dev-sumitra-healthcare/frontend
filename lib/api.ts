@@ -1167,6 +1167,10 @@ export const registerExistingPatient = async (patientId: string) => {
   return apiClient.post(`/patients/${patientId}/enroll`);
 };
 
+export const coordinatorEnrollPatient = async (globalPatientId: string) => {
+  return apiClient.post(`/coordinator/patients/enroll/${globalPatientId}`);
+};
+
 // --- Patient Portal (Self) API Functions ---
 export interface PatientUpcomingAppointment {
   appointmentId: string;
@@ -2396,6 +2400,11 @@ export const getDoctorAvailability = async (doctorId: string, hospitalId: string
 // Book appointment
 export const bookPatientAppointment = async (data: { doctorId: string; hospitalId: string; scheduledTime: string; appointmentType?: string }): Promise<AxiosResponse<{ status: string; message: string; data: BookingConfirmation }>> => {
   return apiClient.post('/patients/appointments', data);
+};
+
+// Book appointment (as Doctor for any patient)
+export const bookDoctorAppointment = async (data: { patientId: string; scheduledTime: string; appointmentType?: string; reason?: string }): Promise<AxiosResponse<{ status: string; message: string; data: { appointment: any } }>> => {
+  return apiClient.post('/doctors/appointments', data);
 };
 
 // ============================================
