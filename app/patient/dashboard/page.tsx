@@ -242,7 +242,20 @@ export default function PatientDashboardPage() {
       }
 
       // Format the scheduled time as ISO string
-      const scheduledTime = `${data.date}T${data.timeSlot}:00`;
+      // Format the scheduled time as ISO string (handling 12h format from modal)
+      // data.timeSlot e.g. "09:00 AM" or "02:30 PM"
+      const [timeStr, period] = data.timeSlot.split(' ');
+      let [hoursStr, minutes] = timeStr.split(':');
+      let hours = parseInt(hoursStr, 10);
+      
+      if (period === 'PM' && hours !== 12) {
+        hours += 12;
+      } else if (period === 'AM' && hours === 12) {
+        hours = 0;
+      }
+      
+      const formattedHours = hours.toString().padStart(2, '0');
+      const scheduledTime = `${data.date}T${formattedHours}:${minutes}:00`;
 
       const response = await bookPatientAppointment({
         doctorId: data.doctorId,

@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/form";
 import { PatientRegistrationSchema } from "@/lib/schemas";
 import { toast } from "sonner";
-import { searchCoordinatorPatients, createCoordinatorPatient, registerExistingPatient } from "@/lib/api";
+import { searchCoordinatorPatients, createCoordinatorPatient, registerExistingPatient, coordinatorEnrollPatient } from "@/lib/api";
 
 // Schema for the initial search step
 const SearchSchema = z.object({
@@ -72,12 +72,20 @@ export function AddPatientWizard() {
   const onEnroll = async () => {
     if (!selectedPatient) return;
     try {
-      await registerExistingPatient(selectedPatient.id);
+      await coordinatorEnrollPatient(selectedPatient.id);
       toast.success(`Enrolled ${selectedPatient.full_name} successfully!`);
       setIsOpen(false);
       resetWizard();
-    } catch (error) {
-      toast.error("Failed to enroll patient");
+    } catch (error: any) {
+      if (error.response?.status === 409) {
+        toast.error(error.response.data.message || "Patient already enrolled");
+        // Optional: Reset or redirect
+        if (error.response.data.data?.patientId) {
+             // Maybe offer to view that patient? For now just error.
+        }
+      } else {
+        toast.error("Failed to enroll patient");
+      }
     }
   };
 
@@ -177,9 +185,15 @@ export function AddPatientWizard() {
                         {patient.phone} • {patient.gender} • {patient.uhid}
                       </div>
                     </div>
-                    <Button size="sm" onClick={() => { setSelectedPatient(patient); setStep("enroll_existing"); }}>
-                      Select
-                    </Button>
+                    {patient.hospital_id ? (
+                        <Button size="sm" variant="secondary" disabled>
+                          Already Enrolled
+                        </Button>
+                    ) : (
+                        <Button size="sm" onClick={() => { setSelectedPatient(patient); setStep("enroll_existing"); }}>
+                          Select
+                        </Button>
+                    )}
                   </div>
                 ))}
               </div>

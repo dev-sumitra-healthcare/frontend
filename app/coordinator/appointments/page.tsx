@@ -264,10 +264,35 @@ export default function CoordinatorAppointments() {
         setCreateError("Doctor, patient and scheduled time are required.");
         return;
       }
+      let finalPatientId = patientId;
+
+      // Check if selected patient needs enrollment (Network/Global patient)
+      // Access custom property or check hospital_id if available on selectedPatient
+      // Note: selectedPatient type might need casting as it comes from API specific response
+      if (selectedPatient && (!(selectedPatient as any).hospital_id && !(selectedPatient as any).isLocal)) {
+          try {
+            const enrollRes = await coordinatorEnrollPatient(selectedPatient.id);
+            if (enrollRes.data.success) {
+                finalPatientId = enrollRes.data.data.patient.id;
+                toast.success("Patient enrolled automatically into hospital directory");
+            }
+          } catch (enrollErr: any) {
+            // Handle if patient was already enrolled (race condition or previous error)
+            if (enrollErr.response?.status === 409 && enrollErr.response.data?.data?.patientId) {
+                finalPatientId = enrollErr.response.data.data.patientId;
+                toast.info("Patient was already enrolled, using existing record");
+            } else {
+                setCreateError("Failed to enroll network patient. Please enroll them from the Patients page first.");
+                setCreating(false);
+                return;
+            }
+          }
+      }
+
       setCreating(true);
       await createCoordinatorAppointment({
         practitionerId,
-        patientId,
+        patientId: finalPatientId, // Use the potentially new local ID
         scheduledTime: new Date(scheduledTime).toISOString(),
         appointmentType,
       });
